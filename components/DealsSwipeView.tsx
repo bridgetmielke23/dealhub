@@ -3,6 +3,7 @@
 import { useRef, useState, type ComponentProps } from 'react';
 import dynamic from 'next/dynamic';
 import DealCardList from './DealCardList';
+import { Deal } from '@/types/deal';
 
 // Load MapView only on the client (Leaflet needs window)
 const MapView = dynamic(() => import('./MapView'), {
@@ -15,6 +16,21 @@ type DealsSwipeViewProps = ComponentProps<typeof DealCardList>;
 export default function DealsSwipeView(props: DealsSwipeViewProps) {
   const [activeIndex, setActiveIndex] = useState(0); // 0 = List, 1 = Map
   const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // Convert selectedDealId to selectedDeal for MapView
+  const selectedDeal = props.selectedDealId 
+    ? props.deals.find(d => d.id === props.selectedDealId) || null
+    : null;
+
+  // Convert onDealSelect from string to Deal | null for MapView
+  const handleMapDealSelect = (deal: Deal | null) => {
+    if (deal) {
+      props.onDealSelect(deal.id);
+    } else {
+      // If null, we can't call onDealSelect with null, so we'll just ignore it
+      // or find a way to handle this - for now, we'll just not call it
+    }
+  };
 
   const handleTabClick = (index: number) => {
     if (!containerRef.current) return;
@@ -70,8 +86,9 @@ export default function DealsSwipeView(props: DealsSwipeViewProps) {
         <section className="snap-start flex-shrink-0 w-full h-full">
           <MapView
             deals={props.deals}
-            selectedDealId={props.selectedDealId}
-            onDealSelect={props.onDealSelect}
+            selectedDeal={selectedDeal}
+            onDealSelect={handleMapDealSelect}
+            userLocation={undefined}
           />
         </section>
       </div>

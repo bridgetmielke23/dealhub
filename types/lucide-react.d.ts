@@ -24,5 +24,6 @@ declare module 'lucide-react' {
   export const ExternalLink: FC<IconProps>;
   export const ChevronLeft: FC<IconProps>;
   export const ChevronRight: FC<IconProps>;
+  export const ArrowLeft: FC<IconProps>;
 }
 

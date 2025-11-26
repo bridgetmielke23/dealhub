@@ -298,22 +298,27 @@ export async function deleteDeal(id: string): Promise<boolean> {
  */
 export async function uploadImage(file: File, path: string): Promise<string | null> {
   try {
-    const { data, error } = await supabaseAdmin?.storage
+    if (!supabaseAdmin) {
+      console.error('Supabase admin client not configured');
+      return null;
+    }
+
+    const uploadResult = await supabaseAdmin.storage
       .from('deal-images')
       .upload(path, file, {
         cacheControl: '3600',
         upsert: false,
       });
 
-    if (error || !data) {
-      console.error('Error uploading image:', error);
+    if (uploadResult.error || !uploadResult.data) {
+      console.error('Error uploading image:', uploadResult.error);
       return null;
     }
 
     // Get public URL
-    const { data: urlData } = supabaseAdmin?.storage
+    const { data: urlData } = supabaseAdmin.storage
       .from('deal-images')
-      .getPublicUrl(data.path);
+      .getPublicUrl(uploadResult.data.path);
 
     return urlData?.publicUrl || null;
   } catch (error) {
