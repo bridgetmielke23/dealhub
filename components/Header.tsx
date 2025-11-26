@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { MapPin, Search, X } from "lucide-react";
+import { MapPin, Search } from "lucide-react";
 import Link from "next/link";
 
 interface HeaderProps {
@@ -54,7 +54,7 @@ export default function Header({ searchQuery = '', onSearchChange, resultCount =
                   className="p-1.5 active:bg-gray-200 rounded-full transition-colors flex-shrink-0 touch-manipulation min-w-[36px] min-h-[36px] flex items-center justify-center"
                   aria-label="Clear search"
                 >
-                  <X size={18} className="text-gray-500" />
+                  <span className="text-gray-500 text-lg font-semibold leading-none">×</span>
                 </button>
               )}
             </div>
@@ -108,7 +108,7 @@ export default function Header({ searchQuery = '', onSearchChange, resultCount =
                     onClick={() => onSearchChange?.('')}
                     className="p-1 hover:bg-gray-200 rounded-full transition-colors flex-shrink-0"
                   >
-                    <X size={16} className="text-gray-400" />
+                    <span className="text-gray-400 text-base font-semibold leading-none">×</span>
                   </motion.button>
                 )}
               </div>
