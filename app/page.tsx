@@ -21,7 +21,6 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [isDealsExpanded, setIsDealsExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showSearchBar, setShowSearchBar] = useState(false);
   const { location, loading: locationLoading, error: locationError, permissionDenied, requestLocation } = useUserLocation();
 
   useEffect(() => {
@@ -86,15 +85,14 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
+    <div className="min-h-screen bg-white flex flex-col relative">
       <Header />
-      <main className="flex-1 flex flex-col overflow-hidden relative">
-        {/* Floating Search Bar - Airbnb style */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="absolute top-4 left-1/2 transform -translate-x-1/2 z-40 w-full max-w-2xl px-4"
-        >
+      {/* Floating Search Bar - Airbnb style */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="fixed top-24 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-2xl px-4"
+      >
           <div className="bg-white rounded-full shadow-xl border border-gray-200 overflow-hidden">
             <div className="flex items-center gap-3 px-6 py-4">
               <Search size={20} className="text-gray-400 flex-shrink-0" />
@@ -131,7 +129,7 @@ export default function HomePage() {
             )}
           </div>
         </motion.div>
-
+      <main className="flex-1 flex flex-col overflow-hidden relative">
         {/* Map Section - Full screen seamless like Airbnb */}
         <div 
           className={`transition-all duration-500 ease-in-out ${
@@ -140,7 +138,7 @@ export default function HomePage() {
         >
           <div className="relative h-full w-full">
             {/* Map Controls - Floating */}
-            <div className="absolute top-20 left-4 z-30 flex flex-col gap-2">
+            <div className="absolute top-24 left-4 z-30 flex flex-col gap-2">
               {!location && !locationLoading && (
                 <motion.button
                   whileHover={{ scale: 1.05 }}
