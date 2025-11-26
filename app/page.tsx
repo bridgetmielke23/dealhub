@@ -104,7 +104,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      <Header searchQuery={searchQuery} onSearchChange={setSearchQuery} />
+      <Header searchQuery={searchQuery} onSearchChange={setSearchQuery} resultCount={filteredDeals.length} />
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
         {/* Mobile: View Toggle Bar - Sticky at top */}
         <div className="lg:hidden sticky top-[73px] z-40 bg-white border-b border-gray-200 px-3 py-2.5 flex items-center justify-between shadow-sm">

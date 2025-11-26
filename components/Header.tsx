@@ -7,9 +7,10 @@ import Link from "next/link";
 interface HeaderProps {
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
+  resultCount?: number;
 }
 
-export default function Header({ searchQuery = '', onSearchChange }: HeaderProps) {
+export default function Header({ searchQuery = '', onSearchChange, resultCount = 0 }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm backdrop-blur-md bg-white/95">
       <div className="w-full px-3 sm:px-4 lg:px-8">
@@ -25,35 +26,43 @@ export default function Header({ searchQuery = '', onSearchChange }: HeaderProps
             <div className="flex items-center gap-2">
               <Link
                 href="/admin"
-                className="px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+                className="px-3 py-1.5 text-xs font-medium text-gray-700 active:bg-gray-100 rounded-full transition-colors touch-manipulation"
               >
                 Admin
               </Link>
-              <button className="px-3 py-1.5 bg-gradient-to-r from-rose-500 to-pink-600 text-white text-xs font-semibold rounded-full">
+              <button className="px-3 py-1.5 bg-gradient-to-r from-rose-500 to-pink-600 text-white text-xs font-semibold rounded-full touch-manipulation">
                 Sign in
               </button>
             </div>
           </div>
-          {/* Search Bar - Full width on mobile */}
+          {/* Search Bar - Full width on mobile, more prominent */}
           <div className="w-full">
-            <div className="flex items-center gap-2 px-3 py-2.5 bg-gray-50 rounded-full border border-gray-200">
-              <Search size={18} className="text-gray-400 flex-shrink-0" />
+            <div className="flex items-center gap-2 px-4 py-3 bg-white rounded-full border-2 border-gray-200 shadow-sm active:border-rose-300 focus-within:border-rose-400 focus-within:shadow-md transition-all">
+              <Search size={20} className="text-gray-400 flex-shrink-0" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => onSearchChange?.(e.target.value)}
-                placeholder="Search deals..."
-                className="flex-1 outline-none bg-transparent text-gray-700 placeholder-gray-400 text-sm"
+                placeholder="Search deals, restaurants, 'free'..."
+                className="flex-1 outline-none bg-transparent text-gray-700 placeholder-gray-400 text-base"
+                autoComplete="off"
               />
               {searchQuery && (
                 <button
                   onClick={() => onSearchChange?.('')}
-                  className="p-1 hover:bg-gray-200 rounded-full transition-colors flex-shrink-0"
+                  className="p-1.5 active:bg-gray-200 rounded-full transition-colors flex-shrink-0 touch-manipulation min-w-[32px] min-h-[32px] flex items-center justify-center"
                 >
-                  <X size={16} className="text-gray-400" />
+                  <X size={18} className="text-gray-400" />
                 </button>
               )}
             </div>
+            {searchQuery && (
+              <div className="mt-2 px-2">
+                <p className="text-xs text-gray-600">
+                  <span className="font-semibold text-rose-600">{resultCount}</span> {resultCount === 1 ? 'deal' : 'deals'} found
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
