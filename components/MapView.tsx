@@ -72,7 +72,8 @@ export default function MapView({ deals, selectedDeal, onDealSelect, userLocatio
       center={center}
       zoom={zoom}
       scrollWheelZoom={true}
-      style={{ height: '100%', width: '100%' }}
+      style={{ height: '100%', width: '100%', zIndex: 0 }}
+      className="rounded-none"
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'

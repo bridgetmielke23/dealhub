@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import DealCardGrid from '@/components/DealCardGrid';
 import Header from '@/components/Header';
 import { Deal } from '@/types/deal';
-import { ChevronUp, ChevronDown, List, Map as MapIcon, MapPin, Loader2 } from 'lucide-react';
+import { ChevronUp, ChevronDown, List, Map as MapIcon, MapPin, Loader2, Search, X } from 'lucide-react';
 import { useUserLocation } from '@/lib/useLocation';
 import { motion } from 'framer-motion';
 
@@ -17,13 +17,49 @@ const MapView = dynamic(() => import('../components/MapView'), {
 export default function HomePage() {
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
   const [deals, setDeals] = useState<Deal[]>([]);
+  const [filteredDeals, setFilteredDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDealsExpanded, setIsDealsExpanded] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearchBar, setShowSearchBar] = useState(false);
   const { location, loading: locationLoading, error: locationError, permissionDenied, requestLocation } = useUserLocation();
 
   useEffect(() => {
     fetchDeals();
   }, [location]);
+
+  useEffect(() => {
+    // Filter deals based on search query
+    if (!searchQuery.trim()) {
+      setFilteredDeals(deals);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase().trim();
+    const filtered = deals.filter((deal) => {
+      const storeName = deal.storeName.toLowerCase();
+      const title = deal.title.toLowerCase();
+      const description = (deal.description || '').toLowerCase();
+      const category = deal.category.toLowerCase();
+      const city = deal.location.city.toLowerCase();
+      const state = deal.location.state.toLowerCase();
+      
+      // Check for keywords like "free"
+      const isFree = query.includes('free') && (title.includes('free') || description.includes('free'));
+      
+      return (
+        storeName.includes(query) ||
+        title.includes(query) ||
+        description.includes(query) ||
+        category.includes(query) ||
+        city.includes(query) ||
+        state.includes(query) ||
+        isFree
+      );
+    });
+    
+    setFilteredDeals(filtered);
+  }, [searchQuery, deals]);
 
   const fetchDeals = async () => {
     setLoading(true);
@@ -36,6 +72,7 @@ export default function HomePage() {
       const result = await response.json();
       if (result.success) {
         setDeals(result.data);
+        setFilteredDeals(result.data);
       }
     } catch (error) {
       console.error('Error fetching deals:', error);
@@ -52,97 +89,107 @@ export default function HomePage() {
     <div className="min-h-screen bg-white flex flex-col">
       <Header />
       <main className="flex-1 flex flex-col overflow-hidden relative">
-        {/* Hero Section - Airbnb style */}
-        <div className="px-4 sm:px-6 lg:px-8 pt-8 pb-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-3 tracking-tight">
-              Find the Best Deals
-              <br />
-              <span className="bg-gradient-to-r from-rose-500 to-pink-600 bg-clip-text text-transparent">
-                Near You
-              </span>
-            </h1>
-            <p className="text-lg text-gray-600 max-w-2xl">
-              Discover amazing deals on restaurants, gas stations, grocery stores, and coffee shops. 
-              Save money on your everyday purchases.
-            </p>
-          </motion.div>
-        </div>
-
-        {/* Map Section - Resizes based on deals panel state */}
-        <div 
-          className={`transition-all duration-500 ease-in-out px-4 sm:px-6 lg:px-8 ${
-            isDealsExpanded ? 'pb-4' : 'pb-2 flex-1'
-          }`}
+        {/* Floating Search Bar - Airbnb style */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="absolute top-4 left-1/2 transform -translate-x-1/2 z-40 w-full max-w-2xl px-4"
         >
-          <div className="bg-white rounded-2xl shadow-lg overflow-hidden h-full border border-gray-100">
-            <div className="p-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <h2 className="text-xl font-semibold text-gray-900 mb-1">Map View</h2>
-                  <p className="text-sm text-gray-500">Click on markers to see deal details</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {!location && !locationLoading && (
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={requestLocation}
-                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-rose-500 to-pink-600 text-white rounded-full hover:shadow-lg transition-shadow text-sm font-medium"
-                    >
-                      <MapPin size={16} />
-                      <span className="hidden sm:inline">Use My Location</span>
-                    </motion.button>
-                  )}
-                  {location && (
-                    <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-full text-sm font-medium border border-emerald-200">
-                      <MapPin size={16} />
-                      <span className="hidden sm:inline">Location Active</span>
-                    </div>
-                  )}
-                  {locationLoading && (
-                    <div className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-600 rounded-full text-sm">
-                      <Loader2 size={16} className="animate-spin" />
-                      <span className="hidden sm:inline">Getting location...</span>
-                    </div>
-                  )}
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={toggleDealsPanel}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white rounded-full hover:bg-gray-800 transition-colors font-medium shadow-md"
-                  >
-                    {isDealsExpanded ? (
-                      <>
-                        <MapIcon size={18} />
-                        <span className="hidden sm:inline">Focus Map</span>
-                      </>
-                    ) : (
-                      <>
-                        <List size={18} />
-                        <span className="hidden sm:inline">Show Deals</span>
-                      </>
-                    )}
-                  </motion.button>
-                </div>
-              </div>
-              {permissionDenied && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800"
+          <div className="bg-white rounded-full shadow-xl border border-gray-200 overflow-hidden">
+            <div className="flex items-center gap-3 px-6 py-4">
+              <Search size={20} className="text-gray-400 flex-shrink-0" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search for deals, restaurants, 'free', or locations..."
+                className="flex-1 outline-none text-gray-700 placeholder-gray-400 text-sm"
+              />
+              {searchQuery && (
+                <motion.button
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => setSearchQuery('')}
+                  className="p-1 hover:bg-gray-100 rounded-full transition-colors"
                 >
-                  Location permission denied. Enable location access to see deals near you.
-                </motion.div>
+                  <X size={18} className="text-gray-400" />
+                </motion.button>
               )}
             </div>
+            {searchQuery && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="px-6 pb-4 border-t border-gray-100"
+              >
+                <p className="text-sm text-gray-600">
+                  Found <span className="font-semibold text-rose-600">{filteredDeals.length}</span> {filteredDeals.length === 1 ? 'deal' : 'deals'}
+                </p>
+              </motion.div>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Map Section - Full screen seamless like Airbnb */}
+        <div 
+          className={`transition-all duration-500 ease-in-out ${
+            isDealsExpanded ? 'pb-4' : 'flex-1'
+          }`}
+        >
+          <div className="relative h-full w-full">
+            {/* Map Controls - Floating */}
+            <div className="absolute top-20 left-4 z-30 flex flex-col gap-2">
+              {!location && !locationLoading && (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={requestLocation}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-white rounded-full shadow-lg hover:shadow-xl transition-shadow text-sm font-medium border border-gray-200"
+                >
+                  <MapPin size={18} className="text-rose-500" />
+                  <span className="hidden sm:inline">Use My Location</span>
+                </motion.button>
+              )}
+              {location && (
+                <div className="flex items-center gap-2 px-4 py-2.5 bg-white rounded-full shadow-lg text-sm font-medium border border-emerald-200 bg-emerald-50">
+                  <MapPin size={18} className="text-emerald-600" />
+                  <span className="hidden sm:inline text-emerald-700">Location Active</span>
+                </div>
+              )}
+              {locationLoading && (
+                <div className="flex items-center gap-2 px-4 py-2.5 bg-white rounded-full shadow-lg text-sm border border-gray-200">
+                  <Loader2 size={18} className="animate-spin text-gray-600" />
+                  <span className="hidden sm:inline text-gray-600">Getting location...</span>
+                </div>
+              )}
+            </div>
+
+            {/* Toggle Button - Floating */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={toggleDealsPanel}
+              className="absolute bottom-6 right-6 z-30 flex items-center gap-2 px-5 py-3 bg-white rounded-full shadow-xl hover:shadow-2xl transition-shadow font-medium border border-gray-200"
+            >
+              {isDealsExpanded ? (
+                <>
+                  <MapIcon size={20} />
+                  <span className="hidden sm:inline">Show Map</span>
+                </>
+              ) : (
+                <>
+                  <List size={20} />
+                  <span className="hidden sm:inline">Show List</span>
+                </>
+              )}
+            </motion.button>
+
+            {/* Map Container - Full screen */}
             <div 
-              className={`transition-all duration-500 ease-in-out ${
-                isDealsExpanded ? 'h-[300px]' : 'h-[calc(100vh-250px)] min-h-[500px]'
+              className={`transition-all duration-500 ease-in-out w-full ${
+                isDealsExpanded ? 'h-[300px]' : 'h-[calc(100vh-80px)]'
               }`}
               data-map-container
             >
@@ -159,13 +206,24 @@ export default function HomePage() {
                 </div>
               ) : (
                 <MapView 
-                  deals={deals} 
+                  deals={filteredDeals} 
                   selectedDeal={selectedDeal} 
                   onDealSelect={setSelectedDeal}
                   userLocation={location}
                 />
               )}
             </div>
+
+            {/* Permission Denied Banner */}
+            {permissionDenied && (
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="absolute top-24 left-1/2 transform -translate-x-1/2 z-30 px-4 py-3 bg-amber-50 border border-amber-200 rounded-full text-sm text-amber-800 shadow-lg"
+              >
+                Location permission denied. Enable location access to see deals near you.
+              </motion.div>
+            )}
           </div>
         </div>
 
@@ -187,12 +245,13 @@ export default function HomePage() {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900 mb-1">
-                    {deals.length} {deals.length === 1 ? 'Deal' : 'Deals'} Available
+                    {filteredDeals.length} {filteredDeals.length === 1 ? 'Deal' : 'Deals'} {searchQuery ? 'Found' : 'Available'}
                   </h2>
                   <p className="text-sm text-gray-500">
                     {isDealsExpanded 
                       ? 'Click on a deal card to view it on the map' 
                       : 'Tap to explore all deals'}
+                    {searchQuery && ` • Searching for "${searchQuery}"`}
                   </p>
                 </div>
                 <motion.div
@@ -217,15 +276,22 @@ export default function HomePage() {
             }`}
           >
             <div className="px-4 sm:px-6 lg:px-8 py-6">
-              <DealCardGrid 
-                deals={deals} 
-                selectedDeal={selectedDeal}
-                onDealSelect={(deal) => {
-                  setSelectedDeal(deal);
-                  // Optionally collapse deals panel when a deal is selected
-                  // setIsDealsExpanded(false);
-                }}
-              />
+              {filteredDeals.length === 0 && searchQuery ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-500 text-lg mb-2">No deals found for &quot;{searchQuery}&quot;</p>
+                  <p className="text-gray-400 text-sm">Try searching for a restaurant name, category, or keyword like &quot;free&quot;</p>
+                </div>
+              ) : (
+                <DealCardGrid 
+                  deals={filteredDeals} 
+                  selectedDeal={selectedDeal}
+                  onDealSelect={(deal) => {
+                    setSelectedDeal(deal);
+                    // Optionally collapse deals panel when a deal is selected
+                    // setIsDealsExpanded(false);
+                  }}
+                />
+              )}
             </div>
           </div>
 
@@ -233,7 +299,7 @@ export default function HomePage() {
           {!isDealsExpanded && (
             <div className="px-4 sm:px-6 lg:px-8 py-5">
               <div className="flex gap-4 overflow-x-auto pb-2 hide-scrollbar scroll-smooth">
-                {deals.slice(0, 4).map((deal, index) => (
+                {filteredDeals.slice(0, 4).map((deal, index) => (
                   <motion.div
                     key={deal.id}
                     initial={{ opacity: 0, x: 20 }}
@@ -276,13 +342,22 @@ export default function HomePage() {
                   </motion.div>
                 ))}
               </div>
-              {deals.length > 4 && (
+              {filteredDeals.length > 4 && (
                 <motion.p
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   className="text-center text-sm text-gray-500 mt-4 font-medium"
                 >
-                  +{deals.length - 4} more deals • Tap to explore all
+                  +{filteredDeals.length - 4} more deals • Tap to explore all
+                </motion.p>
+              )}
+              {filteredDeals.length === 0 && searchQuery && (
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-center text-sm text-gray-400 mt-4"
+                >
+                  No deals match your search
                 </motion.p>
               )}
             </div>
