@@ -46,32 +46,41 @@ export default function DealCard({ deal, isSelected = false, onSelect }: DealCar
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -4 }}
       transition={{ duration: 0.3 }}
-      className={`bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all cursor-pointer ${
-        isSelected ? 'ring-2 ring-primary-500 shadow-lg' : ''
+      className={`bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer border border-gray-100 ${
+        isSelected ? 'ring-2 ring-rose-500 shadow-xl scale-[1.02]' : ''
       }`}
       onClick={handleDealClick}
     >
-      {/* Image Container */}
-      <div className="relative h-48 overflow-hidden">
-        <img
+      {/* Image Container - Airbnb style */}
+      <div className="relative h-64 overflow-hidden group">
+        <motion.img
           src={currentDeal?.image || deal.image}
           alt={currentDeal?.title || deal.title}
           className="w-full h-full object-cover"
+          whileHover={{ scale: 1.05 }}
+          transition={{ duration: 0.3 }}
         />
         
+        {/* Gradient overlay on hover */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+        
         {/* Badges */}
-        <div className="absolute top-3 left-3 flex flex-col gap-2">
+        <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
           {currentDeal?.badge && <DealBadge type={currentDeal.badge} />}
           {deal.badge && deal.badge !== currentDeal?.badge && (
             <DealBadge type={deal.badge} />
           )}
         </div>
 
-        {/* Discount Badge */}
-        <div className="absolute top-3 right-3 bg-accent-500 text-white px-3 py-1 rounded-full font-bold text-sm">
+        {/* Discount Badge - Enhanced */}
+        <motion.div
+          whileHover={{ scale: 1.1 }}
+          className="absolute top-4 right-4 bg-gradient-to-r from-rose-500 to-pink-600 text-white px-4 py-2 rounded-full font-bold text-sm shadow-lg"
+        >
           {currentDeal?.discount || deal.discount}% OFF
-        </div>
+        </motion.div>
 
         {/* Multiple Deals Indicator */}
         {hasMultipleDeals && (
@@ -83,67 +92,75 @@ export default function DealCard({ deal, isSelected = false, onSelect }: DealCar
         )}
       </div>
 
-      {/* Content */}
-      <div className="p-4">
-        <div className="flex items-start justify-between mb-2">
-          <div className="flex-1">
+      {/* Content - Airbnb style */}
+      <div className="p-5">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-gray-900 text-lg mb-1 line-clamp-1">
               {deal.storeName}
             </h3>
-            <p className="text-gray-600 text-sm line-clamp-2 mb-2">
+            <p className="text-gray-600 text-sm line-clamp-2 leading-relaxed">
               {currentDeal?.title || deal.title}
             </p>
           </div>
         </div>
 
-        {/* Price */}
+        {/* Price - Enhanced */}
         {(currentDeal?.originalPrice && currentDeal?.discountedPrice) || (deal.originalPrice && deal.discountedPrice) ? (
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-baseline gap-2 mb-4">
             <span className="text-gray-400 line-through text-sm">
               ${(currentDeal?.originalPrice || deal.originalPrice || 0).toFixed(2)}
             </span>
-            <span className="text-primary-600 font-bold text-lg">
+            <span className="text-gray-900 font-bold text-xl">
               ${(currentDeal?.discountedPrice || deal.discountedPrice || 0).toFixed(2)}
+            </span>
+            <span className="text-rose-600 font-semibold text-sm">
+              Save ${((currentDeal?.originalPrice || deal.originalPrice || 0) - (currentDeal?.discountedPrice || deal.discountedPrice || 0)).toFixed(2)}
             </span>
           </div>
         ) : null}
 
-        {/* Location */}
-        <div className="flex items-center gap-1 text-gray-500 text-sm mb-2">
-          <MapPin size={14} />
-          <span className="line-clamp-1">
-            {deal.location.city}, {deal.location.state}
-          </span>
-          {deal.distance && (
-            <span className="ml-1">• {deal.distance.toFixed(1)} km</span>
-          )}
+        {/* Location & Expires - Combined */}
+        <div className="space-y-2 mb-4">
+          <div className="flex items-center gap-1.5 text-gray-600 text-sm">
+            <MapPin size={16} className="text-gray-400" />
+            <span className="line-clamp-1">
+              {deal.location.city}, {deal.location.state}
+            </span>
+            {deal.distance && (
+              <span className="text-gray-400">• {deal.distance.toFixed(1)} km away</span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1.5 text-gray-500 text-sm">
+            <Clock size={16} className="text-gray-400" />
+            <span>
+              Expires {new Date(currentDeal?.expiresAt || deal.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </span>
+          </div>
         </div>
 
-        {/* Expires */}
-        <div className="flex items-center gap-1 text-gray-500 text-xs mb-3">
-          <Clock size={12} />
-          <span>
-            Ends {new Date(currentDeal?.expiresAt || deal.expiresAt).toLocaleDateString()}
-          </span>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+        {/* Action Buttons - Enhanced */}
+        <div className="flex items-center gap-2 pt-4 border-t border-gray-100">
           {onSelect && (
-            <button
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={handleShowOnMap}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all ${
                 isSelected
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-primary-50 text-primary-600 hover:bg-primary-100'
+                  ? 'bg-gradient-to-r from-rose-500 to-pink-600 text-white shadow-md'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              <Map size={14} />
+              <Map size={16} />
               <span>{isSelected ? 'On Map' : 'Show on Map'}</span>
-            </button>
+            </motion.button>
           )}
           {(currentDeal?.partnerAppName || deal.partnerAppName) && (
-            <button
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={(e) => {
                 e.stopPropagation();
                 const url = currentDeal?.partnerAppUrl || deal.partnerAppUrl;
@@ -151,11 +168,11 @@ export default function DealCard({ deal, isSelected = false, onSelect }: DealCar
                   window.open(url, "_blank", "noopener,noreferrer");
                 }
               }}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-primary-600 text-sm font-medium hover:bg-primary-50 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-rose-500 to-pink-600 text-white text-sm font-semibold hover:shadow-lg transition-all"
             >
-              <ExternalLink size={14} />
-              <span>View in {(currentDeal?.partnerAppName || deal.partnerAppName)}</span>
-            </button>
+              <ExternalLink size={16} />
+              <span>Get Deal</span>
+            </motion.button>
           )}
         </div>
       </div>
