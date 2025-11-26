@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, MapPin, Upload, Search, Loader2, Check, Globe, AlertCircle } from 'lucide-react';
-import { Deal, DealCategory } from '@/types/deal';
+import { Deal, DealCategory, DealItem } from '@/types/deal';
 import { searchStoreLocations, LocationResult } from '@/lib/geocoding';
 import { searchAllStoreLocations, OverpassLocation } from '@/lib/overpass';
 
@@ -21,30 +21,43 @@ export default function AdminPage() {
   const [nationwideFilter, setNationwideFilter] = useState({ state: '', city: '' });
   const [adminPassword, setAdminPassword] = useState<string>('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [formData, setFormData] = useState<Partial<Deal>>({
+  // Store-level data
+  const [storeData, setStoreData] = useState({
     storeName: '',
-    category: 'restaurant',
-    title: '',
-    description: '',
-    image: '',
-    discount: 0,
-    originalPrice: 0,
-    discountedPrice: 0,
-    location: {
-      lat: 40.7589,
-      lng: -73.9851,
-      address: '',
-      city: '',
-      state: '',
-      zipCode: '',
-    },
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    partnerAppUrl: '',
-    partnerAppName: '',
+    category: 'restaurant' as DealCategory,
+    storeLogo: '',
   });
   
-  // Separate state for start date (not in Deal type, but useful for scheduling)
-  const [startDate, setStartDate] = useState<Date>(new Date());
+  // Multiple deals per store
+  const [storeDeals, setStoreDeals] = useState<Array<{
+    id: string;
+    title: string;
+    description: string;
+    image: string;
+    discount: number;
+    originalPrice?: number;
+    discountedPrice?: number;
+    startDate: Date;
+    endDate: Date;
+    partnerAppUrl?: string;
+    partnerAppName?: string;
+  }>>([]);
+  
+  // Form state for adding/editing a single deal
+  const [currentDeal, setCurrentDeal] = useState<{
+    title: string;
+    description: string;
+    image: string;
+    discount: number;
+    originalPrice?: number;
+    discountedPrice?: number;
+    startDate: Date;
+    endDate: Date;
+    partnerAppUrl?: string;
+    partnerAppName?: string;
+  } | null>(null);
+  
+  const [editingDealIndex, setEditingDealIndex] = useState<number | null>(null);
   
   // Helper to format date for input field (YYYY-MM-DD)
   const formatDateForInput = (date: Date | string | undefined): string => {
@@ -93,112 +106,113 @@ export default function AdminPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate dates
-    if (formData.expiresAt) {
-      const endDate = new Date(formData.expiresAt);
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
-      endDate.setHours(23, 59, 59, 999);
-      
-      if (endDate < start) {
-        alert('End date must be after start date');
-        return;
-      }
-    }
-    
-    // If multiple locations are selected, create deals for all of them
-    if (selectedLocations.size > 1 && !editingDeal) {
-      if (!confirm(`Create ${selectedLocations.size} deals for all selected locations?`)) {
-        return;
-      }
-      
-      try {
-        const selectedIndices = Array.from(selectedLocations);
-        let successCount = 0;
-        let errorCount = 0;
-
-        for (const index of selectedIndices) {
-          const location = storeLocations[index];
-          const address = 'address' in location ? location.address : location.address || '';
-          const city = 'city' in location ? location.city : location.city || '';
-          const state = 'state' in location ? location.state : location.state || '';
-          const zipCode = 'zipCode' in location ? location.zipCode : location.zipCode || '';
-          
-          const dealData = {
-            ...formData,
-            location: {
-              lat: location.lat,
-              lng: location.lng,
-              address: address,
-              city: city,
-              state: state,
-              zipCode: zipCode,
-            },
-          };
-
-          try {
-            const headers: HeadersInit = { 'Content-Type': 'application/json' };
-            if (adminPassword) {
-              headers['Authorization'] = `Bearer ${adminPassword}`;
-            }
-            
-            const response = await fetch('/api/deals', {
-              method: 'POST',
-              headers,
-              body: JSON.stringify(dealData),
-            });
-
-            const result = await response.json();
-            if (result.success) {
-              successCount++;
-            } else {
-              errorCount++;
-            }
-          } catch (error) {
-            errorCount++;
-            console.error(`Error creating deal for location ${index}:`, error);
-          }
-        }
-
-        alert(`Created ${successCount} deal(s) successfully. ${errorCount > 0 ? `${errorCount} failed.` : ''}`);
-        await fetchDeals();
-        setShowForm(false);
-        resetForm();
-      } catch (error) {
-        console.error('Error creating deals:', error);
-        alert('Failed to create some deals');
-      }
+    // Validate store data
+    if (!storeData.storeName.trim()) {
+      alert('Please enter a store name');
       return;
     }
-
-    // Single deal creation/update
+    
+    if (storeDeals.length === 0) {
+      alert('Please add at least one deal');
+      return;
+    }
+    
+    if (selectedLocations.size === 0) {
+      alert('Please select at least one location');
+      return;
+    }
+    
+    if (!confirm(`Create ${storeDeals.length} deal(s) for ${selectedLocations.size} location(s)? This will create ${storeDeals.length * selectedLocations.size} total deal records.`)) {
+      return;
+    }
+    
     try {
-      const url = editingDeal
-        ? `/api/deals/${editingDeal.id}`
-        : '/api/deals';
-      const method = editingDeal ? 'PUT' : 'POST';
+      const selectedIndices = Array.from(selectedLocations);
+      let successCount = 0;
+      let errorCount = 0;
 
-      const headers: HeadersInit = { 'Content-Type': 'application/json' };
-      if (adminPassword) {
-        headers['Authorization'] = `Bearer ${adminPassword}`;
+      for (const index of selectedIndices) {
+        const location = storeLocations[index];
+        const address = 'address' in location ? location.address : location.address || '';
+        const city = 'city' in location ? location.city : location.city || '';
+        const state = 'state' in location ? location.state : location.state || '';
+        const zipCode = 'zipCode' in location ? location.zipCode : location.zipCode || '';
+        
+        // Convert store deals to DealItem format
+        const dealItems: DealItem[] = storeDeals.map(deal => ({
+          id: deal.id,
+          title: deal.title,
+          description: deal.description,
+          image: deal.image,
+          discount: deal.discount,
+          originalPrice: deal.originalPrice,
+          discountedPrice: deal.discountedPrice,
+          expiresAt: deal.endDate,
+          partnerAppUrl: deal.partnerAppUrl,
+          partnerAppName: deal.partnerAppName,
+        }));
+        
+        // Use the first deal as the main deal data
+        const mainDeal = storeDeals[0];
+        
+        const dealData = {
+          storeName: storeData.storeName,
+          category: storeData.category,
+          storeLogo: storeData.storeLogo || undefined,
+          title: mainDeal.title,
+          description: mainDeal.description,
+          image: mainDeal.image,
+          discount: mainDeal.discount,
+          originalPrice: mainDeal.originalPrice,
+          discountedPrice: mainDeal.discountedPrice,
+          location: {
+            lat: location.lat,
+            lng: location.lng,
+            address: address as string,
+            city: city as string,
+            state: state as string,
+            zipCode: zipCode as string,
+          },
+          expiresAt: mainDeal.endDate,
+          deals: dealItems,
+          views: 0,
+          clicks: 0,
+          partnerAppUrl: mainDeal.partnerAppUrl,
+          partnerAppName: mainDeal.partnerAppName,
+        };
+
+        try {
+          const headers: HeadersInit = { 'Content-Type': 'application/json' };
+          if (adminPassword) {
+            headers['Authorization'] = `Bearer ${adminPassword}`;
+          }
+          
+          const response = await fetch('/api/deals', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(dealData),
+          });
+
+          const result = await response.json();
+          if (result.success) {
+            successCount++;
+          } else {
+            errorCount++;
+            console.error(`Failed to create deal for location ${index}:`, result.error);
+          }
+        } catch (error) {
+          errorCount++;
+          console.error(`Error creating deal for location ${index}:`, error);
+        }
       }
 
-      const response = await fetch(url, {
-        method,
-        headers,
-        body: JSON.stringify(formData),
-      });
-
-      const result = await response.json();
-      if (result.success) {
-        await fetchDeals();
-        setShowForm(false);
-        setEditingDeal(null);
-        resetForm();
-      }
+      alert(`Created ${successCount} location(s) successfully with ${storeDeals.length} deal(s) each. ${errorCount > 0 ? `${errorCount} failed.` : ''}`);
+      await fetchDeals();
+      setShowForm(false);
+      resetForm();
     } catch (error) {
-      console.error('Error saving deal:', error);
-      alert('Failed to save deal');
+      console.error('Error creating deals:', error);
+      alert('Failed to create some deals');
     }
   };
 
@@ -227,38 +241,124 @@ export default function AdminPage() {
 
   const handleEdit = (deal: Deal) => {
     setEditingDeal(deal);
-    setFormData(deal);
-    // Set start date to 7 days before expiresAt, or today if expiresAt is in the past
-    const expiresAtDate = new Date(deal.expiresAt);
-    const sevenDaysBefore = new Date(expiresAtDate.getTime() - 7 * 24 * 60 * 60 * 1000);
-    setStartDate(sevenDaysBefore < new Date() ? new Date() : sevenDaysBefore);
+    // For editing, we'll need to populate the form with existing deal data
+    // This is a simplified version - you may want to enhance this
+    setStoreData({
+      storeName: deal.storeName,
+      category: deal.category,
+      storeLogo: deal.storeLogo || '',
+    });
+    // Convert deal.deals array to storeDeals format
+    if (deal.deals && deal.deals.length > 0) {
+      const convertedDeals = deal.deals.map(d => ({
+        id: d.id,
+        title: d.title,
+        description: d.description,
+        image: d.image || deal.image,
+        discount: d.discount,
+        originalPrice: d.originalPrice,
+        discountedPrice: d.discountedPrice,
+        startDate: new Date(d.expiresAt.getTime() - 7 * 24 * 60 * 60 * 1000),
+        endDate: d.expiresAt,
+        partnerAppUrl: d.partnerAppUrl,
+        partnerAppName: d.partnerAppName,
+      }));
+      setStoreDeals(convertedDeals);
+    } else {
+      // If no deals array, create one from the main deal
+      setStoreDeals([{
+        id: deal.id,
+        title: deal.title,
+        description: deal.description,
+        image: deal.image,
+        discount: deal.discount,
+        originalPrice: deal.originalPrice,
+        discountedPrice: deal.discountedPrice,
+        startDate: new Date(deal.expiresAt.getTime() - 7 * 24 * 60 * 60 * 1000),
+        endDate: deal.expiresAt,
+        partnerAppUrl: deal.partnerAppUrl,
+        partnerAppName: deal.partnerAppName,
+      }]);
+    }
     setShowForm(true);
   };
 
-  const resetForm = () => {
-    const defaultEndDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    setFormData({
-      storeName: '',
-      category: 'restaurant',
+  // Deal management functions
+  const addDeal = () => {
+    if (!currentDeal || !currentDeal.title || !currentDeal.image) {
+      alert('Please fill in at least title and image for the deal');
+      return;
+    }
+    
+    if (currentDeal.endDate < currentDeal.startDate) {
+      alert('End date must be after start date');
+      return;
+    }
+    
+    if (editingDealIndex !== null) {
+      // Update existing deal
+      const updated = [...storeDeals];
+      updated[editingDealIndex] = { ...currentDeal, id: updated[editingDealIndex].id };
+      setStoreDeals(updated);
+      setEditingDealIndex(null);
+    } else {
+      // Add new deal
+      setStoreDeals([...storeDeals, { ...currentDeal, id: Date.now().toString() }]);
+    }
+    
+    // Reset current deal form
+    setCurrentDeal({
       title: '',
       description: '',
       image: '',
       discount: 0,
-      originalPrice: 0,
-      discountedPrice: 0,
-      location: {
-        lat: 40.7589,
-        lng: -73.9851,
-        address: '',
-        city: '',
-        state: '',
-        zipCode: '',
-      },
-      expiresAt: defaultEndDate,
-      partnerAppUrl: '',
-      partnerAppName: '',
+      originalPrice: undefined,
+      discountedPrice: undefined,
+      startDate: new Date(),
+      endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      partnerAppUrl: undefined,
+      partnerAppName: undefined,
     });
-    setStartDate(new Date());
+  };
+  
+  // Initialize currentDeal when adding a new deal
+  const startAddingDeal = () => {
+    if (!currentDeal) {
+      setCurrentDeal({
+        title: '',
+        description: '',
+        image: '',
+        discount: 0,
+        originalPrice: undefined,
+        discountedPrice: undefined,
+        startDate: new Date(),
+        endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        partnerAppUrl: undefined,
+        partnerAppName: undefined,
+      });
+    }
+  };
+  
+  const editDeal = (index: number) => {
+    setCurrentDeal({ ...storeDeals[index] });
+    setEditingDealIndex(index);
+  };
+  
+  const removeDeal = (index: number) => {
+    if (confirm('Remove this deal?')) {
+      setStoreDeals(storeDeals.filter((_, i) => i !== index));
+    }
+  };
+  
+  const resetForm = () => {
+    setStoreData({
+      storeName: '',
+      category: 'restaurant',
+      storeLogo: '',
+    });
+    setStoreDeals([]);
+    setCurrentDeal(null);
+    setEditingDealIndex(null);
     setStoreSearchQuery('');
     setStoreLocations([]);
     setSelectedLocations(new Set());
@@ -304,8 +404,8 @@ export default function AdminPage() {
         }
       } else {
         // Local search using Nominatim
-        const city = formData.location?.city || nationwideFilter.city || '';
-        const state = formData.location?.state || nationwideFilter.state || '';
+        const city = nationwideFilter.city || '';
+        const state = nationwideFilter.state || '';
         
         setSearchProgress('Searching locations...');
         const locations = await searchStoreLocations(storeSearchQuery, city, state);
@@ -395,199 +495,328 @@ export default function AdminPage() {
         {/* Add/Edit Form */}
         {showForm && (
           <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
-            <h2 className="text-2xl font-semibold mb-4">
-              {editingDeal ? 'Edit Deal' : 'Add New Deal'}
+            <h2 className="text-2xl font-semibold mb-6">
+              {editingDeal ? 'Edit Deal' : 'Add Deals to Store'}
             </h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Store Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.storeName}
-                    onChange={(e) =>
-                      setFormData({ ...formData, storeName: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Category *
-                  </label>
-                  <select
-                    required
-                    value={formData.category}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        category: e.target.value as DealCategory,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  >
-                    <option value="restaurant">Restaurant</option>
-                    <option value="grocery">Grocery</option>
-                    <option value="gas">Gas Station</option>
-                    <option value="coffee">Coffee</option>
-                  </select>
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Title *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.title}
-                    onChange={(e) =>
-                      setFormData({ ...formData, title: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Description
-                  </label>
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) =>
-                      setFormData({ ...formData, description: e.target.value })
-                    }
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Image URL *
-                  </label>
-                  <input
-                    type="url"
-                    required
-                    value={formData.image}
-                    onChange={(e) =>
-                      setFormData({ ...formData, image: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Discount (%) *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    max="100"
-                    value={formData.discount}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        discount: parseFloat(e.target.value),
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Original Price
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.originalPrice || ''}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        originalPrice: parseFloat(e.target.value) || undefined,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Discounted Price
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.discountedPrice || ''}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        discountedPrice: parseFloat(e.target.value) || undefined,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Start Date
-                  </label>
-                  <input
-                    type="date"
-                    value={formatDateForInput(startDate)}
-                    onChange={(e) => {
-                      const newStartDate = getDateFromInput(e.target.value);
-                      setStartDate(newStartDate);
-                      const currentEndDate = formData.expiresAt ? new Date(formData.expiresAt) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-                      // If start date is after end date, adjust end date to be 7 days after start
-                      if (newStartDate > currentEndDate) {
-                        setFormData({
-                          ...formData,
-                          expiresAt: new Date(newStartDate.getTime() + 7 * 24 * 60 * 60 * 1000),
-                        });
+            <form onSubmit={handleSubmit} className="space-y-8">
+              {/* Step 1: Store Information */}
+              <div className="border-b border-gray-200 pb-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Step 1: Store Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Store/Brand Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={storeData.storeName}
+                      onChange={(e) =>
+                        setStoreData({ ...storeData, storeName: e.target.value })
                       }
-                    }}
-                    min={formatDateForInput(new Date())}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">When the deal becomes active (defaults to today)</p>
+                      placeholder="e.g., Starbucks, McDonald's, Walmart"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Category *
+                    </label>
+                    <select
+                      required
+                      value={storeData.category}
+                      onChange={(e) =>
+                        setStoreData({
+                          ...storeData,
+                          category: e.target.value as DealCategory,
+                        })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    >
+                      <option value="restaurant">Restaurant</option>
+                      <option value="grocery">Grocery</option>
+                      <option value="gas">Gas Station</option>
+                      <option value="coffee">Coffee</option>
+                    </select>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Store Logo URL (optional)
+                    </label>
+                    <input
+                      type="url"
+                      value={storeData.storeLogo}
+                      onChange={(e) =>
+                        setStoreData({ ...storeData, storeLogo: e.target.value })
+                      }
+                      placeholder="https://example.com/logo.png"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                  </div>
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    End Date (Expires) *
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={formatDateForInput(formData.expiresAt)}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        expiresAt: getDateFromInput(e.target.value),
-                      })
-                    }
-                    min={formatDateForInput(new Date())}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">When the deal expires</p>
+              {/* Step 2: Deal Management */}
+              <div className="border-b border-gray-200 pb-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Step 2: Add Deals ({storeDeals.length} added)
+                </h3>
+                
+                {/* List of added deals */}
+                {storeDeals.length > 0 && (
+                  <div className="mb-6 space-y-3">
+                    {storeDeals.map((deal, index) => (
+                      <div key={deal.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="font-semibold text-gray-900">{deal.title}</div>
+                            <div className="text-sm text-gray-600 mt-1">{deal.description}</div>
+                            <div className="text-xs text-gray-500 mt-2">
+                              {formatDateForInput(deal.startDate)} - {formatDateForInput(deal.endDate)} | {deal.discount}% off
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => editDeal(index)}
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                            >
+                              <Edit size={16} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeDeal(index)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Add/Edit Deal Form */}
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-semibold text-gray-900">
+                      {editingDealIndex !== null ? 'Edit Deal' : 'Add New Deal'}
+                    </h4>
+                    {!currentDeal && (
+                      <button
+                        type="button"
+                        onClick={startAddingDeal}
+                        className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        <Plus size={16} className="inline mr-1" />
+                        New Deal
+                      </button>
+                    )}
+                  </div>
+                  {currentDeal && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Deal Title *
+                      </label>
+                      <input
+                        type="text"
+                        value={currentDeal?.title || ''}
+                        onChange={(e) =>
+                          setCurrentDeal({
+                            ...currentDeal!,
+                            title: e.target.value,
+                            description: currentDeal?.description || '',
+                            image: currentDeal?.image || '',
+                            discount: currentDeal?.discount || 0,
+                            originalPrice: currentDeal?.originalPrice,
+                            discountedPrice: currentDeal?.discountedPrice,
+                            startDate: currentDeal?.startDate || new Date(),
+                            endDate: currentDeal?.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                            partnerAppUrl: currentDeal?.partnerAppUrl,
+                            partnerAppName: currentDeal?.partnerAppName,
+                          })
+                        }
+                        placeholder="e.g., Buy One Get One Free"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Description
+                      </label>
+                      <textarea
+                        value={currentDeal?.description || ''}
+                        onChange={(e) =>
+                          setCurrentDeal({
+                            ...currentDeal!,
+                            description: e.target.value,
+                            title: currentDeal?.title || '',
+                            image: currentDeal?.image || '',
+                            discount: currentDeal?.discount || 0,
+                            originalPrice: currentDeal?.originalPrice,
+                            discountedPrice: currentDeal?.discountedPrice,
+                            startDate: currentDeal?.startDate || new Date(),
+                            endDate: currentDeal?.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                            partnerAppUrl: currentDeal?.partnerAppUrl,
+                            partnerAppName: currentDeal?.partnerAppName,
+                          })
+                        }
+                        rows={2}
+                        placeholder="Deal description..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Image URL *
+                      </label>
+                      <input
+                        type="url"
+                        value={currentDeal?.image || ''}
+                        onChange={(e) =>
+                          setCurrentDeal({
+                            ...currentDeal!,
+                            image: e.target.value,
+                            title: currentDeal?.title || '',
+                            description: currentDeal?.description || '',
+                            discount: currentDeal?.discount || 0,
+                            originalPrice: currentDeal?.originalPrice,
+                            discountedPrice: currentDeal?.discountedPrice,
+                            startDate: currentDeal?.startDate || new Date(),
+                            endDate: currentDeal?.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                            partnerAppUrl: currentDeal?.partnerAppUrl,
+                            partnerAppName: currentDeal?.partnerAppName,
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Discount (%) *
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={currentDeal?.discount || 0}
+                        onChange={(e) =>
+                          setCurrentDeal({
+                            ...currentDeal!,
+                            discount: parseFloat(e.target.value) || 0,
+                            title: currentDeal?.title || '',
+                            description: currentDeal?.description || '',
+                            image: currentDeal?.image || '',
+                            originalPrice: currentDeal?.originalPrice,
+                            discountedPrice: currentDeal?.discountedPrice,
+                            startDate: currentDeal?.startDate || new Date(),
+                            endDate: currentDeal?.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                            partnerAppUrl: currentDeal?.partnerAppUrl,
+                            partnerAppName: currentDeal?.partnerAppName,
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Start Date *
+                      </label>
+                      <input
+                        type="date"
+                        value={formatDateForInput(currentDeal?.startDate)}
+                        onChange={(e) => {
+                          const newStart = getDateFromInput(e.target.value);
+                          setCurrentDeal({
+                            ...currentDeal!,
+                            startDate: newStart,
+                            endDate: currentDeal?.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                            title: currentDeal?.title || '',
+                            description: currentDeal?.description || '',
+                            image: currentDeal?.image || '',
+                            discount: currentDeal?.discount || 0,
+                            originalPrice: currentDeal?.originalPrice,
+                            discountedPrice: currentDeal?.discountedPrice,
+                            partnerAppUrl: currentDeal?.partnerAppUrl,
+                            partnerAppName: currentDeal?.partnerAppName,
+                          });
+                        }}
+                        min={formatDateForInput(new Date())}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        End Date *
+                      </label>
+                      <input
+                        type="date"
+                        value={formatDateForInput(currentDeal?.endDate)}
+                        onChange={(e) =>
+                          setCurrentDeal({
+                            ...currentDeal!,
+                            endDate: getDateFromInput(e.target.value),
+                            startDate: currentDeal?.startDate || new Date(),
+                            title: currentDeal?.title || '',
+                            description: currentDeal?.description || '',
+                            image: currentDeal?.image || '',
+                            discount: currentDeal?.discount || 0,
+                            originalPrice: currentDeal?.originalPrice,
+                            discountedPrice: currentDeal?.discountedPrice,
+                            partnerAppUrl: currentDeal?.partnerAppUrl,
+                            partnerAppName: currentDeal?.partnerAppName,
+                          })
+                        }
+                        min={formatDateForInput(currentDeal?.startDate || new Date())}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div className="md:col-span-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={addDeal}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        {editingDealIndex !== null ? 'Update Deal' : 'Add Deal'}
+                      </button>
+                      {editingDealIndex !== null && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCurrentDeal({
+                              title: '',
+                              description: '',
+                              image: '',
+                              discount: 0,
+                              originalPrice: undefined,
+                              discountedPrice: undefined,
+                              startDate: new Date(),
+                              endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                              partnerAppUrl: undefined,
+                              partnerAppName: undefined,
+                            });
+                            setEditingDealIndex(null);
+                          }}
+                          className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                        >
+                          Cancel Edit
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  )}
                 </div>
+              </div>
 
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Location *
-                  </label>
-                  
-                  {/* Store Location Search */}
+              {/* Step 3: Location Selection */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Step 3: Select Locations ({selectedLocations.size} selected)
+                </h3>
+                
+                {/* Store Location Search */}
                   <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
@@ -711,26 +940,7 @@ export default function AdminPage() {
                                   } else {
                                     const allIndices = new Set(storeLocations.map((_, i) => i));
                                     setSelectedLocations(allIndices);
-                                    // Auto-fill form with first location when selecting all
-                                    if (storeLocations.length > 0) {
-                                      const firstLoc = storeLocations[0];
-                                      const address = ('address' in firstLoc ? firstLoc.address : firstLoc.address) || '';
-                                      const city = ('city' in firstLoc ? firstLoc.city : firstLoc.city) || '';
-                                      const state = ('state' in firstLoc ? firstLoc.state : firstLoc.state) || '';
-                                      const zipCode = ('zipCode' in firstLoc ? firstLoc.zipCode : firstLoc.zipCode) || '';
-                                      
-                                      setFormData({
-                                        ...formData,
-                                        location: {
-                                          lat: firstLoc.lat,
-                                          lng: firstLoc.lng,
-                                          address: address as string,
-                                          city: city as string,
-                                          state: state as string,
-                                          zipCode: zipCode as string,
-                                        },
-                                      });
-                                    }
+                                    // No need to auto-fill - we just select locations
                                   }
                                 }}
                                 className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
@@ -776,28 +986,6 @@ export default function AdminPage() {
                                     newSelected.add(index);
                                   }
                                   setSelectedLocations(newSelected);
-                                  
-                                  // Auto-fill form with first selected location
-                                  if (newSelected.size === 1) {
-                                    const firstIndex = Array.from(newSelected)[0];
-                                    const selectedLoc = storeLocations[firstIndex];
-                                    const selAddress = (('address' in selectedLoc ? selectedLoc.address : selectedLoc.address) || '') as string;
-                                    const selCity = (('city' in selectedLoc ? selectedLoc.city : selectedLoc.city) || '') as string;
-                                    const selState = (('state' in selectedLoc ? selectedLoc.state : selectedLoc.state) || '') as string;
-                                    const selZipCode = (('zipCode' in selectedLoc ? selectedLoc.zipCode : selectedLoc.zipCode) || '') as string;
-                                    
-                                    setFormData({
-                                      ...formData,
-                                      location: {
-                                        lat: selectedLoc.lat,
-                                        lng: selectedLoc.lng,
-                                        address: selAddress,
-                                        city: selCity,
-                                        state: selState,
-                                        zipCode: selZipCode,
-                                      },
-                                    });
-                                  }
                                 }}
                               >
                                 <div className="flex items-start gap-3">
@@ -843,144 +1031,16 @@ export default function AdminPage() {
                       </div>
                     )}
                   </div>
-
-                  {/* Manual Location Entry (Fallback) */}
-                  <details className="mt-4">
-                    <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-900 mb-2">
-                      Or enter location manually
-                    </summary>
-                    <div className="grid grid-cols-2 gap-4 mt-3">
-                      <div>
-                        <label className="block text-xs text-gray-600 mb-1">
-                          Address
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.location?.address || ''}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              location: {
-                                ...formData.location!,
-                                address: e.target.value,
-                              },
-                            })
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-600 mb-1">
-                          City
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.location?.city || ''}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              location: {
-                                ...formData.location!,
-                                city: e.target.value,
-                              },
-                            })
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-600 mb-1">
-                          State
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.location?.state || ''}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              location: {
-                                ...formData.location!,
-                                state: e.target.value,
-                              },
-                            })
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-600 mb-1">
-                          ZIP Code
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.location?.zipCode || ''}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              location: {
-                                ...formData.location!,
-                                zipCode: e.target.value,
-                              },
-                            })
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-600 mb-1">
-                          Latitude
-                        </label>
-                        <input
-                          type="number"
-                          step="0.000001"
-                          value={formData.location?.lat || ''}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              location: {
-                                ...formData.location!,
-                                lat: parseFloat(e.target.value) || 0,
-                              },
-                            })
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-600 mb-1">
-                          Longitude
-                        </label>
-                        <input
-                          type="number"
-                          step="0.000001"
-                          value={formData.location?.lng || ''}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              location: {
-                                ...formData.location!,
-                                lng: parseFloat(e.target.value) || 0,
-                              },
-                            })
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        />
-                      </div>
-                    </div>
-                  </details>
-                </div>
               </div>
 
-              <div className="flex gap-4 pt-4">
+              {/* Submit Buttons */}
+              <div className="flex gap-4 pt-6 border-t border-gray-200">
                 <button
                   type="submit"
                   className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                  disabled={storeDeals.length === 0 || selectedLocations.size === 0}
                 >
-                  {editingDeal 
-                    ? 'Update Deal' 
-                    : selectedLocations.size > 1 
-                      ? `Create ${selectedLocations.size} Deals` 
-                      : 'Create Deal'}
+                  Create {storeDeals.length} Deal(s) for {selectedLocations.size} Location(s)
                 </button>
                 <button
                   type="button"
