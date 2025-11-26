@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
-  viewport: "width=device-width, initial-scale=1",
+  viewport: "width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes",
 };
 
 export default function RootLayout({

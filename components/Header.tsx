@@ -12,8 +12,53 @@ interface HeaderProps {
 export default function Header({ searchQuery = '', onSearchChange }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm backdrop-blur-md bg-white/95">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20 gap-4">
+      <div className="w-full px-3 sm:px-4 lg:px-8">
+        {/* Mobile Layout - Stacked */}
+        <div className="flex flex-col md:hidden gap-3 py-3">
+          {/* Top Row: Logo and Actions */}
+          <div className="flex items-center justify-between">
+            <Link href="/" className="flex items-center gap-2 group">
+              <h1 className="text-xl font-bold bg-gradient-to-r from-rose-500 to-pink-600 bg-clip-text text-transparent">
+                DealHub
+              </h1>
+            </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/admin"
+                className="px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                Admin
+              </Link>
+              <button className="px-3 py-1.5 bg-gradient-to-r from-rose-500 to-pink-600 text-white text-xs font-semibold rounded-full">
+                Sign in
+              </button>
+            </div>
+          </div>
+          {/* Search Bar - Full width on mobile */}
+          <div className="w-full">
+            <div className="flex items-center gap-2 px-3 py-2.5 bg-gray-50 rounded-full border border-gray-200">
+              <Search size={18} className="text-gray-400 flex-shrink-0" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => onSearchChange?.(e.target.value)}
+                placeholder="Search deals..."
+                className="flex-1 outline-none bg-transparent text-gray-700 placeholder-gray-400 text-sm"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => onSearchChange?.('')}
+                  className="p-1 hover:bg-gray-200 rounded-full transition-colors flex-shrink-0"
+                >
+                  <X size={16} className="text-gray-400" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop Layout - Horizontal */}
+        <div className="hidden md:flex items-center justify-between h-16 lg:h-20 gap-4">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group flex-shrink-0">
             <motion.div
@@ -22,7 +67,7 @@ export default function Header({ searchQuery = '', onSearchChange }: HeaderProps
               className="relative"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-rose-500 to-pink-600 rounded-xl blur opacity-20 group-hover:opacity-30 transition-opacity"></div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-rose-500 to-pink-600 bg-clip-text text-transparent relative">
+              <h1 className="text-xl lg:text-2xl font-bold bg-gradient-to-r from-rose-500 to-pink-600 bg-clip-text text-transparent relative">
                 DealHub
               </h1>
             </motion.div>
@@ -63,7 +108,7 @@ export default function Header({ searchQuery = '', onSearchChange }: HeaderProps
           <div className="flex items-center gap-3 flex-shrink-0">
             <Link
               href="/admin"
-              className="hidden sm:block px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors"
+              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors"
             >
               Admin
             </Link>

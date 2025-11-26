@@ -91,3 +91,49 @@ html {
   transition-duration: 150ms;
 }
 
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  /* Improve touch targets - minimum 44x44px for accessibility */
+  button, a, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Prevent text selection on tap */
+  button, .cursor-pointer, [onClick] {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+    -webkit-touch-callout: none;
+    user-select: none;
+  }
+  
+  /* Smooth scrolling on mobile */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Better font rendering on mobile */
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Prevent zoom on input focus (iOS) */
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}
+
+/* Touch manipulation for better mobile performance */
+.touch-manipulation {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Safe area insets for notched devices */
+@supports (padding: max(0px)) {
+  body {
+    padding-left: max(0px, env(safe-area-inset-left));
+    padding-right: max(0px, env(safe-area-inset-right));
+  }
+}
+

@@ -19,9 +19,31 @@ export default function HomePage() {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [filteredDeals, setFilteredDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'split' | 'map' | 'list'>('split');
+  // Mobile-first: default to list view on mobile, split on desktop
+  const [viewMode, setViewMode] = useState<'split' | 'map' | 'list'>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const { location, loading: locationLoading, error: locationError, permissionDenied, requestLocation } = useUserLocation();
+
+  // Set default view based on screen size
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        // Desktop: default to split view
+        if (viewMode === 'list') {
+          setViewMode('split');
+        }
+      } else {
+        // Mobile: default to list view
+        if (viewMode === 'split') {
+          setViewMode('list');
+        }
+      }
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     fetchDeals();
@@ -83,41 +105,75 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <Header searchQuery={searchQuery} onSearchChange={setSearchQuery} />
-      <main className="flex-1 flex overflow-hidden relative">
-        {/* Split View - Airbnb style: Map on left, List on right */}
+      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+        {/* Mobile: View Toggle Bar - Sticky at top */}
+        <div className="lg:hidden sticky top-[73px] z-40 bg-white border-b border-gray-200 px-3 py-2.5 flex items-center justify-between shadow-sm">
+          <div className="text-sm font-semibold text-gray-900">
+            {filteredDeals.length} {filteredDeals.length === 1 ? 'Deal' : 'Deals'}
+          </div>
+          <div className="flex gap-1 bg-gray-100 rounded-full p-1">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`px-4 py-2 rounded-full text-xs font-semibold transition-colors touch-manipulation min-h-[36px] ${
+                viewMode === 'list' 
+                  ? 'bg-white text-gray-900 shadow-sm' 
+                  : 'text-gray-600 active:bg-gray-200'
+              }`}
+            >
+              List
+            </button>
+            <button
+              onClick={() => setViewMode('map')}
+              className={`px-4 py-2 rounded-full text-xs font-semibold transition-colors touch-manipulation min-h-[36px] ${
+                viewMode === 'map' 
+                  ? 'bg-white text-gray-900 shadow-sm' 
+                  : 'text-gray-600 active:bg-gray-200'
+              }`}
+            >
+              Map
+            </button>
+          </div>
+        </div>
+
+        {/* Map View - Mobile: Full screen when selected, Desktop: Split */}
         {(viewMode === 'split' || viewMode === 'map') && (
-          <div className={`relative h-[calc(100vh-80px)] transition-all duration-300 ${
-            viewMode === 'split' ? 'w-1/2' : 'w-full'
-          }`}>
+          <div className={`relative transition-all duration-300 ${
+            // Mobile: full screen, Desktop: split or full
+            viewMode === 'split' 
+              ? 'hidden lg:block lg:w-1/2' 
+              : 'w-full'
+          } h-[calc(100vh-73px)] lg:h-[calc(100vh-80px)]`}>
             {/* Map Controls - Floating */}
-            <div className="absolute top-4 left-4 z-30 flex flex-col gap-2">
+            <div className="absolute top-3 left-3 z-30 flex flex-col gap-2">
               {!location && !locationLoading && (
                 <motion.button
-                  whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={requestLocation}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-white rounded-full shadow-lg hover:shadow-xl transition-shadow text-sm font-medium border border-gray-200"
+                  className="flex items-center gap-2 px-3 py-2.5 bg-white rounded-full shadow-lg active:shadow-xl transition-shadow text-xs sm:text-sm font-medium border border-gray-200 touch-manipulation min-h-[44px]"
                 >
                   <MapPin size={18} className="text-rose-500" />
                   <span className="hidden sm:inline">Use My Location</span>
+                  <span className="sm:hidden">Location</span>
                 </motion.button>
               )}
               {location && (
-                <div className="flex items-center gap-2 px-4 py-2.5 bg-white rounded-full shadow-lg text-sm font-medium border border-emerald-200 bg-emerald-50">
+                <div className="flex items-center gap-2 px-3 py-2.5 bg-white rounded-full shadow-lg text-xs sm:text-sm font-medium border border-emerald-200 bg-emerald-50 min-h-[44px]">
                   <MapPin size={18} className="text-emerald-600" />
                   <span className="hidden sm:inline text-emerald-700">Location Active</span>
+                  <span className="sm:hidden text-emerald-700">Active</span>
                 </div>
               )}
               {locationLoading && (
-                <div className="flex items-center gap-2 px-4 py-2.5 bg-white rounded-full shadow-lg text-sm border border-gray-200">
+                <div className="flex items-center gap-2 px-3 py-2.5 bg-white rounded-full shadow-lg text-xs sm:text-sm border border-gray-200 min-h-[44px]">
                   <Loader2 size={18} className="animate-spin text-gray-600" />
                   <span className="hidden sm:inline text-gray-600">Getting location...</span>
+                  <span className="sm:hidden text-gray-600">Loading...</span>
                 </div>
               )}
             </div>
 
-            {/* View Toggle Buttons */}
-            <div className="absolute top-4 right-4 z-30 flex gap-2 bg-white rounded-full shadow-lg p-1 border border-gray-200">
+            {/* Desktop: View Toggle Buttons */}
+            <div className="hidden lg:flex absolute top-4 right-4 z-30 gap-2 bg-white rounded-full shadow-lg p-1 border border-gray-200">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -146,11 +202,7 @@ export default function HomePage() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setViewMode('list')}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  viewMode === 'list' 
-                    ? 'bg-gray-900 text-white' 
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
+                className="px-4 py-2 rounded-full text-sm font-medium transition-colors text-gray-600 hover:bg-gray-100"
               >
                 List
               </motion.button>
@@ -195,10 +247,10 @@ export default function HomePage() {
         {/* Deals List Panel - Right side or full screen */}
         {(viewMode === 'split' || viewMode === 'list') && (
           <div className={`bg-white border-l border-gray-200 transition-all duration-300 overflow-hidden ${
-            viewMode === 'split' ? 'w-1/2' : 'w-full'
-          }`}>
-            {/* List Header */}
-            <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+            viewMode === 'split' ? 'hidden lg:block lg:w-1/2' : 'w-full'
+          } h-[calc(100vh-73px)] lg:h-[calc(100vh-80px)]`}>
+            {/* Desktop: List Header */}
+            <div className="hidden lg:block px-6 py-4 border-b border-gray-100 bg-gray-50">
               <div className="flex items-center justify-between mb-2">
                 <div>
                   <h2 className="text-xl font-bold text-gray-900">
@@ -214,8 +266,8 @@ export default function HomePage() {
             </div>
 
             {/* Deals Content - Scrollable */}
-            <div className="h-[calc(100vh-180px)] overflow-y-auto">
-              <div className="px-4 sm:px-6 lg:px-8 py-6">
+            <div className="h-full lg:h-[calc(100vh-180px)] overflow-y-auto overscroll-contain">
+              <div className="px-3 sm:px-4 lg:px-6 py-4 lg:py-6">
                 {filteredDeals.length === 0 && searchQuery ? (
                   <div className="text-center py-12">
                     <p className="text-gray-500 text-lg mb-2">No deals found for &quot;{searchQuery}&quot;</p>
@@ -229,12 +281,17 @@ export default function HomePage() {
                   <DealCardGrid 
                     deals={filteredDeals} 
                     selectedDeal={selectedDeal}
-                    onDealSelect={(deal) => {
-                      setSelectedDeal(deal);
-                      if (viewMode === 'list') {
+                  onDealSelect={(deal) => {
+                    setSelectedDeal(deal);
+                    // On mobile, switch to map view when deal is selected
+                    if (viewMode === 'list') {
+                      if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                        setViewMode('map');
+                      } else {
                         setViewMode('split');
                       }
-                    }}
+                    }
+                  }}
                   />
                 )}
               </div>

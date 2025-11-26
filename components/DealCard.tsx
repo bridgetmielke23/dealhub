@@ -47,14 +47,15 @@ export default function DealCard({ deal, isSelected = false, onSelect }: DealCar
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -4 }}
+      whileTap={{ scale: 0.98 }}
       transition={{ duration: 0.3 }}
-      className={`bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer border border-gray-100 ${
+      className={`bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer border border-gray-100 touch-manipulation ${
         isSelected ? 'ring-2 ring-rose-500 shadow-xl scale-[1.02]' : ''
       }`}
       onClick={handleDealClick}
     >
       {/* Image Container - Airbnb style */}
-      <div className="relative h-64 overflow-hidden group">
+      <div className="relative h-48 sm:h-64 overflow-hidden group">
         <motion.img
           src={currentDeal?.image || deal.image}
           alt={currentDeal?.title || deal.title}
@@ -140,17 +141,16 @@ export default function DealCard({ deal, isSelected = false, onSelect }: DealCar
           </div>
         </div>
 
-        {/* Action Buttons - Enhanced */}
-        <div className="flex items-center gap-2 pt-4 border-t border-gray-100">
+        {/* Action Buttons - Enhanced for Mobile */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-4 border-t border-gray-100">
           {onSelect && (
             <motion.button
-              whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={handleShowOnMap}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all ${
+              className={`flex items-center justify-center gap-2 px-4 py-3 sm:py-2 rounded-full text-sm font-semibold transition-all touch-manipulation ${
                 isSelected
                   ? 'bg-gradient-to-r from-rose-500 to-pink-600 text-white shadow-md'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  : 'bg-gray-100 text-gray-700 active:bg-gray-200'
               }`}
             >
               <Map size={16} />
@@ -159,7 +159,6 @@ export default function DealCard({ deal, isSelected = false, onSelect }: DealCar
           )}
           {(currentDeal?.partnerAppName || deal.partnerAppName) && (
             <motion.button
-              whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -168,7 +167,7 @@ export default function DealCard({ deal, isSelected = false, onSelect }: DealCar
                   window.open(url, "_blank", "noopener,noreferrer");
                 }
               }}
-              className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-rose-500 to-pink-600 text-white text-sm font-semibold hover:shadow-lg transition-all"
+              className="flex items-center justify-center gap-2 px-4 py-3 sm:py-2 rounded-full bg-gradient-to-r from-rose-500 to-pink-600 text-white text-sm font-semibold active:shadow-lg transition-all touch-manipulation"
             >
               <ExternalLink size={16} />
               <span>Get Deal</span>
