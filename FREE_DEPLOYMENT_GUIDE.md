@@ -322,3 +322,4 @@ npm install next-auth @auth/supabase-adapter
 
 **Ready to deploy?** Let's start implementing the Supabase integration!
 
+

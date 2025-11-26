@@ -79,3 +79,4 @@ Your app is now live and 100% free!
 - Set up analytics
 - Add error tracking
 
+

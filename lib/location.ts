@@ -100,3 +100,4 @@ export function getCenterPoint(coordinates: Coordinates[]): Coordinates {
   return { lat: avgLat, lng: avgLng };
 }
 
+

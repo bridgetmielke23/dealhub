@@ -25,3 +25,4 @@ export function getAuthToken(request: Request): string | null {
   return request.headers.get('authorization')?.replace('Bearer ', '') || null;
 }
 
+
