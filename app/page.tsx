@@ -107,7 +107,7 @@ export default function HomePage() {
       <Header searchQuery={searchQuery} onSearchChange={setSearchQuery} resultCount={filteredDeals.length} />
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
         {/* Mobile: View Toggle Bar - Sticky at top */}
-        <div className="lg:hidden sticky top-[73px] z-40 bg-white border-b border-gray-200 px-3 py-2.5 flex items-center justify-between shadow-sm">
+        <div className="lg:hidden sticky top-[120px] z-40 bg-white border-b border-gray-200 px-3 py-2.5 flex items-center justify-between shadow-sm">
           <div className="text-sm font-semibold text-gray-900">
             {filteredDeals.length} {filteredDeals.length === 1 ? 'Deal' : 'Deals'}
           </div>
@@ -142,7 +142,7 @@ export default function HomePage() {
             viewMode === 'split' 
               ? 'hidden lg:block lg:w-1/2' 
               : 'w-full'
-          } h-[calc(100vh-73px)] lg:h-[calc(100vh-80px)]`}>
+          } h-[calc(100vh-165px)] lg:h-[calc(100vh-80px)]`}>
             {/* Map Controls - Floating */}
             <div className="absolute top-3 left-3 z-30 flex flex-col gap-2">
               {!location && !locationLoading && (
@@ -248,7 +248,7 @@ export default function HomePage() {
         {(viewMode === 'split' || viewMode === 'list') && (
           <div className={`bg-white border-l border-gray-200 transition-all duration-300 overflow-hidden ${
             viewMode === 'split' ? 'hidden lg:block lg:w-1/2' : 'w-full'
-          } h-[calc(100vh-73px)] lg:h-[calc(100vh-80px)]`}>
+          } h-[calc(100vh-165px)] lg:h-[calc(100vh-180px)]`}>
             {/* Desktop: List Header */}
             <div className="hidden lg:block px-6 py-4 border-b border-gray-100 bg-gray-50">
               <div className="flex items-center justify-between mb-2">
@@ -266,7 +266,7 @@ export default function HomePage() {
             </div>
 
             {/* Deals Content - Scrollable */}
-            <div className="h-full lg:h-[calc(100vh-180px)] overflow-y-auto overscroll-contain">
+            <div className="h-full overflow-y-auto overscroll-contain">
               <div className="px-3 sm:px-4 lg:px-6 py-4 lg:py-6">
                 {filteredDeals.length === 0 && searchQuery ? (
                   <div className="text-center py-12">

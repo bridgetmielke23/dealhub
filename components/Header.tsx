@@ -12,10 +12,10 @@ interface HeaderProps {
 
 export default function Header({ searchQuery = '', onSearchChange, resultCount = 0 }: HeaderProps) {
   return (
-    <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm backdrop-blur-md bg-white/95">
+    <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm backdrop-blur-md bg-white/95 w-full">
       <div className="w-full px-3 sm:px-4 lg:px-8">
-        {/* Mobile Layout - Stacked */}
-        <div className="flex flex-col md:hidden gap-3 py-3">
+        {/* Mobile Layout - Stacked - Always visible */}
+        <div className="flex flex-col md:hidden gap-3 py-3 min-h-[120px]">
           {/* Top Row: Logo and Actions */}
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2 group">
@@ -36,27 +36,29 @@ export default function Header({ searchQuery = '', onSearchChange, resultCount =
             </div>
           </div>
           {/* Search Bar - Full width on mobile, more prominent */}
-          <div className="w-full">
-            <div className="flex items-center gap-2 px-4 py-3 bg-white rounded-full border-2 border-gray-200 shadow-sm active:border-rose-300 focus-within:border-rose-400 focus-within:shadow-md transition-all">
-              <Search size={20} className="text-gray-400 flex-shrink-0" />
+          <div className="w-full relative z-10">
+            <div className="flex items-center gap-2 px-4 py-3.5 bg-white rounded-full border-2 border-gray-300 shadow-md focus-within:border-rose-500 focus-within:shadow-lg transition-all">
+              <Search size={20} className="text-rose-500 flex-shrink-0" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => onSearchChange?.(e.target.value)}
                 placeholder="Search deals, restaurants, 'free'..."
-                className="flex-1 outline-none bg-transparent text-gray-700 placeholder-gray-400 text-base"
+                className="flex-1 outline-none bg-transparent text-gray-900 placeholder-gray-500 text-base font-medium"
                 autoComplete="off"
+                autoFocus={false}
               />
               {searchQuery && (
                 <button
                   onClick={() => onSearchChange?.('')}
-                  className="p-1.5 active:bg-gray-200 rounded-full transition-colors flex-shrink-0 touch-manipulation min-w-[32px] min-h-[32px] flex items-center justify-center"
+                  className="p-1.5 active:bg-gray-200 rounded-full transition-colors flex-shrink-0 touch-manipulation min-w-[36px] min-h-[36px] flex items-center justify-center"
+                  aria-label="Clear search"
                 >
-                  <X size={18} className="text-gray-400" />
+                  <X size={18} className="text-gray-500" />
                 </button>
               )}
             </div>
-            {searchQuery && (
+            {searchQuery && resultCount > 0 && (
               <div className="mt-2 px-2">
                 <p className="text-xs text-gray-600">
                   <span className="font-semibold text-rose-600">{resultCount}</span> {resultCount === 1 ? 'deal' : 'deals'} found
