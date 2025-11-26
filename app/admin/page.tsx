@@ -622,20 +622,20 @@ export default function AdminPage() {
                                     // Auto-fill form with first location when selecting all
                                     if (storeLocations.length > 0) {
                                       const firstLoc = storeLocations[0];
-                                      const address = 'address' in firstLoc ? firstLoc.address : firstLoc.address || '';
-                                      const city = 'city' in firstLoc ? firstLoc.city : firstLoc.city || '';
-                                      const state = 'state' in firstLoc ? firstLoc.state : firstLoc.state || '';
-                                      const zipCode = 'zipCode' in firstLoc ? firstLoc.zipCode : firstLoc.zipCode || '';
+                                      const address = ('address' in firstLoc ? firstLoc.address : firstLoc.address) || '';
+                                      const city = ('city' in firstLoc ? firstLoc.city : firstLoc.city) || '';
+                                      const state = ('state' in firstLoc ? firstLoc.state : firstLoc.state) || '';
+                                      const zipCode = ('zipCode' in firstLoc ? firstLoc.zipCode : firstLoc.zipCode) || '';
                                       
                                       setFormData({
                                         ...formData,
                                         location: {
                                           lat: firstLoc.lat,
                                           lng: firstLoc.lng,
-                                          address: address,
-                                          city: city,
-                                          state: state,
-                                          zipCode: zipCode,
+                                          address: address as string,
+                                          city: city as string,
+                                          state: state as string,
+                                          zipCode: zipCode as string,
                                         },
                                       });
                                     }
@@ -662,11 +662,11 @@ export default function AdminPage() {
                           storeLocations.length > 10 ? 'max-h-60' : 'max-h-96'
                         }`}>
                           {storeLocations.map((loc, index) => {
-                            const address = 'address' in loc ? loc.address : loc.address || '';
-                            const city = 'city' in loc ? loc.city : loc.city || '';
-                            const state = 'state' in loc ? loc.state : loc.state || '';
-                            const zipCode = 'zipCode' in loc ? loc.zipCode : loc.zipCode || '';
-                            const displayName = 'displayName' in loc ? loc.displayName : loc.displayName || loc.name || '';
+                            const address = (('address' in loc ? loc.address : loc.address) || '') as string;
+                            const city = (('city' in loc ? loc.city : loc.city) || '') as string;
+                            const state = (('state' in loc ? loc.state : loc.state) || '') as string;
+                            const zipCode = (('zipCode' in loc ? loc.zipCode : loc.zipCode) || '') as string;
+                            const displayName = ('displayName' in loc ? (loc as any).displayName : (loc as any).displayName) || ((loc as any).name || '');
                             
                             return (
                               <div
@@ -689,10 +689,10 @@ export default function AdminPage() {
                                   if (newSelected.size === 1) {
                                     const firstIndex = Array.from(newSelected)[0];
                                     const selectedLoc = storeLocations[firstIndex];
-                                    const selAddress = 'address' in selectedLoc ? selectedLoc.address : selectedLoc.address || '';
-                                    const selCity = 'city' in selectedLoc ? selectedLoc.city : selectedLoc.city || '';
-                                    const selState = 'state' in selectedLoc ? selectedLoc.state : selectedLoc.state || '';
-                                    const selZipCode = 'zipCode' in selectedLoc ? selectedLoc.zipCode : selectedLoc.zipCode || '';
+                                    const selAddress = (('address' in selectedLoc ? selectedLoc.address : selectedLoc.address) || '') as string;
+                                    const selCity = (('city' in selectedLoc ? selectedLoc.city : selectedLoc.city) || '') as string;
+                                    const selState = (('state' in selectedLoc ? selectedLoc.state : selectedLoc.state) || '') as string;
+                                    const selZipCode = (('zipCode' in selectedLoc ? selectedLoc.zipCode : selectedLoc.zipCode) || '') as string;
                                     
                                     setFormData({
                                       ...formData,
@@ -743,7 +743,7 @@ export default function AdminPage() {
                               <div className="text-xs">Form will use this location.</div>
                             ) : (
                               <div className="text-xs">
-                                Click "Create Deal" to create deals for all {selectedLocations.size} locations at once!
+                                Click &quot;Create Deal&quot; to create deals for all {selectedLocations.size} locations at once!
                               </div>
                             )}
                           </div>

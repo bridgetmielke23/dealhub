@@ -37,13 +37,23 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error fetching deals:', error);
-    // Fallback to mock data if Supabase not configured
-    const { mockDeals } = await import('@/data/mockDeals');
+    
+    // Check if it's a Supabase connection error
+    if (error instanceof Error && error.message.includes('Supabase')) {
+      return NextResponse.json({
+        success: false,
+        error: 'Database connection error. Please check environment variables.',
+        data: [],
+        count: 0,
+      }, { status: 500 });
+    }
+    
+    // Fallback to empty array if Supabase not configured
     return NextResponse.json({
       success: true,
-      data: mockDeals,
-      count: mockDeals.length,
-      warning: 'Using mock data - Supabase not configured',
+      data: [],
+      count: 0,
+      warning: 'No deals found. Please configure Supabase or add deals through the admin panel.',
     });
   }
 }

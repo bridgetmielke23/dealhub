@@ -1,28 +1,44 @@
 /**
  * Supabase client configuration
  * Uses environment variables for connection
+ * Optimized for Vercel serverless environment
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Deal } from '@/types/deal';
 
-// Supabase connection
+// Supabase connection - validate environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+// Validate required environment variables
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('⚠️ Supabase environment variables not configured. Some features may not work.');
+}
 
 // Client-side Supabase client (for browser)
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-// Server-side Supabase client (for API routes with admin access)
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-export const supabaseAdmin = supabaseServiceKey
-  ? createClient(supabaseUrl, supabaseServiceKey, {
+// Only create if we have the required keys
+export const supabase: SupabaseClient | null = supabaseUrl && supabaseAnonKey
+  ? createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
-        autoRefreshToken: false,
         persistSession: false,
+        autoRefreshToken: false,
       },
     })
   : null;
+
+// Server-side Supabase client (for API routes with admin access)
+// Only create if we have all required keys
+export const supabaseAdmin: SupabaseClient | null = 
+  supabaseUrl && supabaseServiceKey
+    ? createClient(supabaseUrl, supabaseServiceKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      })
+    : null;
 
 /**
  * Database helper functions
@@ -98,7 +114,15 @@ export async function getDeals(filters?: {
   sort?: string;
 }): Promise<Deal[]> {
   try {
-    let query = supabaseAdmin?.from('deals').select('*') || supabase.from('deals').select('*');
+    // Use admin client if available, otherwise use regular client
+    const client = supabaseAdmin || supabase;
+    
+    if (!client) {
+      console.error('Supabase client not initialized. Check environment variables.');
+      return [];
+    }
+
+    let query = client.from('deals').select('*');
 
     // Filter by category
     if (filters?.category && filters.category !== 'all') {
@@ -162,7 +186,14 @@ export async function getDeals(filters?: {
  */
 export async function getDealById(id: string): Promise<Deal | null> {
   try {
-    const { data, error } = await (supabaseAdmin || supabase)
+    const client = supabaseAdmin || supabase;
+    
+    if (!client) {
+      console.error('Supabase client not initialized. Check environment variables.');
+      return null;
+    }
+
+    const { data, error } = await client
       .from('deals')
       .select('*')
       .eq('id', id)
