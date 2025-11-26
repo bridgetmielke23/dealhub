@@ -265,7 +265,10 @@ export default function AdminPage() {
   };
 
   const handleSearchLocations = async () => {
-    if (!storeSearchQuery.trim()) return;
+    if (!storeSearchQuery.trim()) {
+      alert('Please enter a store name to search');
+      return;
+    }
 
     setSearchingLocations(true);
     setStoreLocations([]);
@@ -275,20 +278,29 @@ export default function AdminPage() {
     try {
       if (searchMode === 'nationwide') {
         // Search ALL locations nationwide using Overpass API
-        setSearchProgress('Searching all locations nationwide... This may take a moment.');
+        setSearchProgress('Searching all locations nationwide... This may take 30-60 seconds. Please wait...');
         
-        const locations = await searchAllStoreLocations(storeSearchQuery, {
-          state: nationwideFilter.state || undefined,
-          city: nationwideFilter.city || undefined,
-        });
-        
-        setStoreLocations(locations);
-        setSearchProgress(`Found ${locations.length} locations!`);
-        
-        if (locations.length === 0) {
-          alert('No locations found. Try a different search term or check the brand name spelling.');
-        } else if (locations.length > 500) {
-          alert(`Found ${locations.length} locations! This is a large number. Consider filtering by state/city.`);
+        try {
+          const locations = await searchAllStoreLocations(storeSearchQuery.trim(), {
+            state: nationwideFilter.state?.trim() || undefined,
+            city: nationwideFilter.city?.trim() || undefined,
+          });
+          
+          setStoreLocations(locations);
+          
+          if (locations.length === 0) {
+            setSearchProgress('No locations found. Try:');
+            alert(`No locations found for "${storeSearchQuery}".\n\nTips:\n- Use the exact brand name (e.g., "Starbucks", "McDonald\'s", "Walmart")\n- Try without special characters\n- Check spelling\n- Some smaller chains may not be in the database`);
+          } else {
+            setSearchProgress(`✓ Found ${locations.length} location${locations.length === 1 ? '' : 's'}!`);
+            if (locations.length > 500) {
+              alert(`Found ${locations.length} locations! This is a large number. Consider filtering by state/city to narrow results.`);
+            }
+          }
+        } catch (error) {
+          console.error('Overpass search error:', error);
+          setSearchProgress('Search failed. Please try again or use a different search term.');
+          alert(`Search failed: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease try:\n- A different store name\n- Checking your internet connection\n- Using the Local search mode instead`);
         }
       } else {
         // Local search using Nominatim
@@ -610,12 +622,12 @@ export default function AdminPage() {
                     </div>
                     
                     {searchMode === 'nationwide' && (
-                      <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                         <div className="flex items-start gap-2">
-                          <AlertCircle size={16} className="text-yellow-600 mt-0.5" />
-                          <div className="text-sm text-yellow-800">
-                            <strong>Nationwide Search:</strong> This will find ALL locations of the store across the entire US. 
-                            This may return hundreds or thousands of locations. You can filter by state/city below.
+                          <AlertCircle size={16} className="text-blue-600 mt-0.5" />
+                          <div className="text-sm text-blue-800">
+                            <strong>Nationwide Search:</strong> Enter the exact store/brand name (e.g., Starbucks, McDonald&apos;s, Walmart). 
+                            This will find ALL locations across the US. Search may take 30-60 seconds. You can filter by state/city below.
                           </div>
                         </div>
                       </div>
@@ -644,7 +656,7 @@ export default function AdminPage() {
                       <input
                         type="text"
                         placeholder={searchMode === 'nationwide' 
-                          ? "Enter brand name (e.g., Dunkin, Starbucks, Shell)" 
+                          ? "Enter exact brand name (e.g., Starbucks, McDonald's, Walmart)" 
                           : "Enter store name (e.g., Starbucks, Whole Foods)"}
                         value={storeSearchQuery}
                         onChange={(e) => setStoreSearchQuery(e.target.value)}
@@ -654,7 +666,8 @@ export default function AdminPage() {
                             handleSearchLocations();
                           }
                         }}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        disabled={searchingLocations}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                       />
                       <button
                         type="button"
