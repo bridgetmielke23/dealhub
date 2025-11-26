@@ -1,16 +1,21 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { MapPin, Search } from "lucide-react";
+import { MapPin, Search, X } from "lucide-react";
 import Link from "next/link";
 
-export default function Header() {
+interface HeaderProps {
+  searchQuery?: string;
+  onSearchChange?: (query: string) => void;
+}
+
+export default function Header({ searchQuery = '', onSearchChange }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm backdrop-blur-md bg-white/95">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
+        <div className="flex items-center justify-between h-20 gap-4">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 group">
+          <Link href="/" className="flex items-center gap-2 group flex-shrink-0">
             <motion.div
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -23,25 +28,39 @@ export default function Header() {
             </motion.div>
           </Link>
 
-          {/* Search Bar - Airbnb style */}
-          <div className="hidden md:flex flex-1 max-w-2xl mx-8">
+          {/* Search Bar - Functional */}
+          <div className="flex-1 max-w-2xl">
             <motion.div
-              whileHover={{ scale: 1.02 }}
+              whileHover={{ scale: 1.01 }}
               className="w-full"
             >
-              <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 rounded-full border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all cursor-pointer">
-                <div className="flex items-center gap-2 flex-1">
-                  <Search size={18} className="text-gray-400" />
-                  <span className="text-sm text-gray-600">Search deals...</span>
-                </div>
-                <div className="h-6 w-px bg-gray-300"></div>
-                <MapPin size={18} className="text-gray-400" />
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-50 rounded-full border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all">
+                <Search size={18} className="text-gray-400 flex-shrink-0" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => onSearchChange?.(e.target.value)}
+                  placeholder="Search deals, restaurants, 'free', or locations..."
+                  className="flex-1 outline-none bg-transparent text-gray-700 placeholder-gray-400 text-sm"
+                />
+                {searchQuery && (
+                  <motion.button
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => onSearchChange?.('')}
+                    className="p-1 hover:bg-gray-200 rounded-full transition-colors flex-shrink-0"
+                  >
+                    <X size={16} className="text-gray-400" />
+                  </motion.button>
+                )}
               </div>
             </motion.div>
           </div>
 
           {/* Right side actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-shrink-0">
             <Link
               href="/admin"
               className="hidden sm:block px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors"
