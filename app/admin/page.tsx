@@ -42,6 +42,21 @@ export default function AdminPage() {
     partnerAppUrl: '',
     partnerAppName: '',
   });
+  
+  // Separate state for start date (not in Deal type, but useful for scheduling)
+  const [startDate, setStartDate] = useState<Date>(new Date());
+  
+  // Helper to format date for input field (YYYY-MM-DD)
+  const formatDateForInput = (date: Date | string | undefined): string => {
+    if (!date) return '';
+    const d = typeof date === 'string' ? new Date(date) : date;
+    return d.toISOString().split('T')[0];
+  };
+  
+  // Helper to get date from input (returns Date object)
+  const getDateFromInput = (dateString: string): Date => {
+    return new Date(dateString + 'T00:00:00');
+  };
 
   useEffect(() => {
     // Check if password is stored in localStorage
@@ -77,6 +92,19 @@ export default function AdminPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate dates
+    if (formData.expiresAt) {
+      const endDate = new Date(formData.expiresAt);
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      endDate.setHours(23, 59, 59, 999);
+      
+      if (endDate < start) {
+        alert('End date must be after start date');
+        return;
+      }
+    }
     
     // If multiple locations are selected, create deals for all of them
     if (selectedLocations.size > 1 && !editingDeal) {
@@ -200,10 +228,15 @@ export default function AdminPage() {
   const handleEdit = (deal: Deal) => {
     setEditingDeal(deal);
     setFormData(deal);
+    // Set start date to 7 days before expiresAt, or today if expiresAt is in the past
+    const expiresAtDate = new Date(deal.expiresAt);
+    const sevenDaysBefore = new Date(expiresAtDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+    setStartDate(sevenDaysBefore < new Date() ? new Date() : sevenDaysBefore);
     setShowForm(true);
   };
 
   const resetForm = () => {
+    const defaultEndDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     setFormData({
       storeName: '',
       category: 'restaurant',
@@ -221,10 +254,11 @@ export default function AdminPage() {
         state: '',
         zipCode: '',
       },
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      expiresAt: defaultEndDate,
       partnerAppUrl: '',
       partnerAppName: '',
     });
+    setStartDate(new Date());
     setStoreSearchQuery('');
     setStoreLocations([]);
     setSelectedLocations(new Set());
@@ -489,6 +523,51 @@ export default function AdminPage() {
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={formatDateForInput(startDate)}
+                    onChange={(e) => {
+                      const newStartDate = getDateFromInput(e.target.value);
+                      setStartDate(newStartDate);
+                      const currentEndDate = formData.expiresAt ? new Date(formData.expiresAt) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+                      // If start date is after end date, adjust end date to be 7 days after start
+                      if (newStartDate > currentEndDate) {
+                        setFormData({
+                          ...formData,
+                          expiresAt: new Date(newStartDate.getTime() + 7 * 24 * 60 * 60 * 1000),
+                        });
+                      }
+                    }}
+                    min={formatDateForInput(new Date())}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">When the deal becomes active (defaults to today)</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    End Date (Expires) *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={formatDateForInput(formData.expiresAt)}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        expiresAt: getDateFromInput(e.target.value),
+                      })
+                    }
+                    min={formatDateForInput(new Date())}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">When the deal expires</p>
                 </div>
 
                 <div className="md:col-span-2">
@@ -927,6 +1006,9 @@ export default function AdminPage() {
                       Location
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Expires
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       Actions
                     </th>
                   </tr>
@@ -964,6 +1046,18 @@ export default function AdminPage() {
                           <MapPin size={14} />
                           {deal.location.city}, {deal.location.state}
                         </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-sm text-gray-600">
+                          {new Date(deal.expiresAt).toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric', 
+                            year: 'numeric' 
+                          })}
+                        </div>
+                        {new Date(deal.expiresAt) < new Date() && (
+                          <div className="text-xs text-red-600 mt-1">Expired</div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
