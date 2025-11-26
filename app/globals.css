@@ -121,6 +121,18 @@ html {
   input, textarea, select {
     font-size: 16px !important;
   }
+  
+  /* Optimize scrolling performance */
+  .overflow-y-auto {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+  
+  /* Better card spacing for scrolling */
+  .grid > * {
+    margin-bottom: 0;
+  }
 }
 
 /* Touch manipulation for better mobile performance */

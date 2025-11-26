@@ -44,13 +44,10 @@ export default function DealCard({ deal, isSelected = false, onSelect }: DealCar
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -4 }}
       whileTap={{ scale: 0.98 }}
-      transition={{ duration: 0.3 }}
-      className={`bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer border border-gray-100 touch-manipulation ${
-        isSelected ? 'ring-2 ring-rose-500 shadow-xl scale-[1.02]' : ''
+      transition={{ duration: 0.2 }}
+      className={`bg-white rounded-2xl overflow-hidden shadow-md active:shadow-lg transition-all duration-200 cursor-pointer border border-gray-100 touch-manipulation ${
+        isSelected ? 'ring-2 ring-rose-500 shadow-lg' : ''
       }`}
       onClick={handleDealClick}
     >

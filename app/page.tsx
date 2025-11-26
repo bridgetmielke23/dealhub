@@ -24,26 +24,7 @@ export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const { location, loading: locationLoading, error: locationError, permissionDenied, requestLocation } = useUserLocation();
 
-  // Set default view based on screen size
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth >= 1024) {
-        // Desktop: default to split view
-        if (viewMode === 'list') {
-          setViewMode('split');
-        }
-      } else {
-        // Mobile: default to list view
-        if (viewMode === 'split') {
-          setViewMode('list');
-        }
-      }
-    };
-
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  // Keep list view as default - don't auto-switch
 
   useEffect(() => {
     fetchDeals();
@@ -106,34 +87,32 @@ export default function HomePage() {
     <div className="min-h-screen bg-white flex flex-col">
       <Header searchQuery={searchQuery} onSearchChange={setSearchQuery} resultCount={filteredDeals.length} />
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
-        {/* Mobile: View Toggle Bar - Sticky at top */}
-        <div className="lg:hidden sticky top-[120px] z-40 bg-white border-b border-gray-200 px-3 py-2.5 flex items-center justify-between shadow-sm">
-          <div className="text-sm font-semibold text-gray-900">
-            {filteredDeals.length} {filteredDeals.length === 1 ? 'Deal' : 'Deals'}
-          </div>
-          <div className="flex gap-1 bg-gray-100 rounded-full p-1">
-            <button
-              onClick={() => setViewMode('list')}
-              className={`px-4 py-2 rounded-full text-xs font-semibold transition-colors touch-manipulation min-h-[36px] ${
-                viewMode === 'list' 
-                  ? 'bg-white text-gray-900 shadow-sm' 
-                  : 'text-gray-600 active:bg-gray-200'
-              }`}
-            >
-              List
-            </button>
-            <button
-              onClick={() => setViewMode('map')}
-              className={`px-4 py-2 rounded-full text-xs font-semibold transition-colors touch-manipulation min-h-[36px] ${
-                viewMode === 'map' 
-                  ? 'bg-white text-gray-900 shadow-sm' 
-                  : 'text-gray-600 active:bg-gray-200'
-              }`}
-            >
-              Map
-            </button>
-          </div>
-        </div>
+        {/* Mobile: Floating Map Button - Only show when in list view */}
+        {viewMode === 'list' && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setViewMode('map')}
+            className="lg:hidden fixed bottom-6 right-6 z-50 flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-rose-500 to-pink-600 text-white rounded-full shadow-2xl font-semibold text-sm touch-manipulation"
+          >
+            <MapPin size={20} />
+            <span>View Map</span>
+          </motion.button>
+        )}
+
+        {/* Mobile: Back to List Button - Only show when in map view */}
+        {viewMode === 'map' && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setViewMode('list')}
+            className="lg:hidden fixed top-[130px] left-4 z-50 flex items-center gap-2 px-4 py-2.5 bg-white rounded-full shadow-xl border border-gray-200 font-semibold text-sm touch-manipulation"
+          >
+            ← Back to List
+          </motion.button>
+        )}
 
         {/* Map View - Mobile: Full screen when selected, Desktop: Split */}
         {(viewMode === 'split' || viewMode === 'map') && (
@@ -244,11 +223,23 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Deals List Panel - Right side or full screen */}
+        {/* Deals List Panel - Primary view, full screen on mobile */}
         {(viewMode === 'split' || viewMode === 'list') && (
-          <div className={`bg-white border-l border-gray-200 transition-all duration-300 overflow-hidden ${
+          <div className={`bg-gray-50 border-l border-gray-200 transition-all duration-300 overflow-hidden ${
             viewMode === 'split' ? 'hidden lg:block lg:w-1/2' : 'w-full'
-          } h-[calc(100vh-165px)] lg:h-[calc(100vh-180px)]`}>
+          } h-[calc(100vh-120px)] lg:h-[calc(100vh-180px)]`}>
+            {/* Mobile: Simple Header */}
+            <div className="lg:hidden px-4 py-3 bg-white border-b border-gray-100">
+              <h2 className="text-lg font-bold text-gray-900">
+                {filteredDeals.length} {filteredDeals.length === 1 ? 'Deal' : 'Deals'} {searchQuery ? 'Found' : 'Available'}
+              </h2>
+              {searchQuery && (
+                <p className="text-sm text-gray-500 mt-1">
+                  &quot;{searchQuery}&quot;
+                </p>
+              )}
+            </div>
+
             {/* Desktop: List Header */}
             <div className="hidden lg:block px-6 py-4 border-b border-gray-100 bg-gray-50">
               <div className="flex items-center justify-between mb-2">
@@ -265,9 +256,9 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Deals Content - Scrollable */}
-            <div className="h-full overflow-y-auto overscroll-contain">
-              <div className="px-3 sm:px-4 lg:px-6 py-4 lg:py-6">
+            {/* Deals Content - Optimized for smooth scrolling */}
+            <div className="h-full overflow-y-auto overscroll-contain -webkit-overflow-scrolling-touch">
+              <div className="px-3 sm:px-4 lg:px-6 py-4 lg:py-6 pb-24 lg:pb-6">
                 {filteredDeals.length === 0 && searchQuery ? (
                   <div className="text-center py-12">
                     <p className="text-gray-500 text-lg mb-2">No deals found for &quot;{searchQuery}&quot;</p>
@@ -283,13 +274,11 @@ export default function HomePage() {
                     selectedDeal={selectedDeal}
                   onDealSelect={(deal) => {
                     setSelectedDeal(deal);
-                    // On mobile, switch to map view when deal is selected
-                    if (viewMode === 'list') {
-                      if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-                        setViewMode('map');
-                      } else {
-                        setViewMode('split');
-                      }
+                    // Keep user in list view - map is optional
+                    // On desktop, optionally switch to split view
+                    if (viewMode === 'list' && typeof window !== 'undefined' && window.innerWidth >= 1024) {
+                      // Optional: switch to split on desktop, but keep list on mobile
+                      // setViewMode('split');
                     }
                   }}
                   />
