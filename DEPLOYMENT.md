@@ -226,3 +226,4 @@ npm install @sentry/nextjs
 **Ready to deploy?** Start with Supabase + Vercel for the fastest path to production!
 
 
+

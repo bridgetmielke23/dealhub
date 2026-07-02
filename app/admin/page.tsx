@@ -5,6 +5,7 @@ import { Plus, Edit, Trash2, MapPin, Upload, Search, Loader2, Check, Globe, Aler
 import { Deal, DealCategory, DealItem } from '@/types/deal';
 import { searchStoreLocations, LocationResult } from '@/lib/geocoding';
 import { searchAllStoreLocations, OverpassLocation } from '@/lib/overpass';
+import { searchStoresInDatabase, bulkSaveStoreLocations, saveStoreLocation, StoreLocation } from '@/lib/storeLocations';
 
 export default function AdminPage() {
   const [deals, setDeals] = useState<Deal[]>([]);
@@ -12,7 +13,8 @@ export default function AdminPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [storeSearchQuery, setStoreSearchQuery] = useState('');
-  const [storeLocations, setStoreLocations] = useState<(LocationResult | OverpassLocation)[]>([]);
+  const [storeLocations, setStoreLocations] = useState<(LocationResult | OverpassLocation | StoreLocation)[]>([]);
+  const [saveToDatabase, setSaveToDatabase] = useState(true); // Option to save API results to database
   const [searchingLocations, setSearchingLocations] = useState(false);
   const [selectedLocations, setSelectedLocations] = useState<Set<number>>(new Set());
   const [showLocationSearch, setShowLocationSearch] = useState(false);
@@ -377,30 +379,79 @@ export default function AdminPage() {
 
     try {
       if (searchMode === 'nationwide') {
-        // Search ALL locations nationwide using Overpass API
-        setSearchProgress('Searching all locations nationwide... This may take 30-60 seconds. Please wait...');
+        // Step 1: Search our database first (fast and reliable)
+        setSearchProgress('Searching database...');
+        const dbLocations = await searchStoresInDatabase(storeSearchQuery.trim(), {
+          state: nationwideFilter.state?.trim() || undefined,
+          city: nationwideFilter.city?.trim() || undefined,
+        });
+
+        if (dbLocations.length > 0) {
+          // Convert StoreLocation to OverpassLocation format for compatibility
+          const convertedLocations: OverpassLocation[] = dbLocations.map(store => ({
+            lat: store.lat,
+            lng: store.lng,
+            name: store.storeName,
+            address: store.address,
+            city: store.city,
+            state: store.state,
+            zipCode: store.zipCode,
+            displayName: store.address 
+              ? `${store.storeName}, ${store.address}, ${store.city}, ${store.state} ${store.zipCode}`.trim()
+              : `${store.storeName}, ${store.city}, ${store.state}`.trim(),
+          }));
+          
+          setStoreLocations(convertedLocations);
+          setSearchProgress(`✓ Found ${convertedLocations.length} location${convertedLocations.length === 1 ? '' : 's'} in database!`);
+          return;
+        }
+
+        // Step 2: If no database results, try Overpass API
+        setSearchProgress('No database results. Searching Overpass API... This may take 30-60 seconds.');
         
         try {
-          const locations = await searchAllStoreLocations(storeSearchQuery.trim(), {
+          const apiLocations = await searchAllStoreLocations(storeSearchQuery.trim(), {
             state: nationwideFilter.state?.trim() || undefined,
             city: nationwideFilter.city?.trim() || undefined,
           });
           
-          setStoreLocations(locations);
-          
-          if (locations.length === 0) {
-            setSearchProgress('No locations found. Try:');
-            alert(`No locations found for "${storeSearchQuery}".\n\nTips:\n- Use the exact brand name (e.g., "Starbucks", "McDonald\'s", "Walmart")\n- Try without special characters\n- Check spelling\n- Some smaller chains may not be in the database`);
+          if (apiLocations.length === 0) {
+            setSearchProgress('No locations found.');
+            alert(`No locations found for "${storeSearchQuery}".\n\nOptions:\n- Add stores manually using "Add Store" button\n- Try a different brand name\n- Check spelling`);
+            return;
+          }
+
+          // Step 3: Optionally save API results to database for future use
+          if (saveToDatabase && apiLocations.length > 0) {
+            setSearchProgress(`Found ${apiLocations.length} locations. Saving to database...`);
+            const storesToSave: StoreLocation[] = apiLocations.map(loc => ({
+              brandName: storeSearchQuery.trim(),
+              storeName: loc.name,
+              address: loc.address,
+              city: loc.city,
+              state: loc.state,
+              zipCode: loc.zipCode,
+              lat: loc.lat,
+              lng: loc.lng,
+              source: 'overpass',
+              verified: false,
+            }));
+            
+            const result = await bulkSaveStoreLocations(storesToSave, storeSearchQuery.trim());
+            setSearchProgress(`✓ Found ${apiLocations.length} locations! Saved ${result.saved} to database for future searches.`);
           } else {
-            setSearchProgress(`✓ Found ${locations.length} location${locations.length === 1 ? '' : 's'}!`);
-            if (locations.length > 500) {
-              alert(`Found ${locations.length} locations! This is a large number. Consider filtering by state/city to narrow results.`);
-            }
+            setSearchProgress(`✓ Found ${apiLocations.length} location${apiLocations.length === 1 ? '' : 's'}!`);
+          }
+          
+          setStoreLocations(apiLocations);
+          
+          if (apiLocations.length > 500) {
+            alert(`Found ${apiLocations.length} locations! This is a large number. Consider filtering by state/city to narrow results.`);
           }
         } catch (error) {
           console.error('Overpass search error:', error);
-          setSearchProgress('Search failed. Please try again or use a different search term.');
-          alert(`Search failed: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease try:\n- A different store name\n- Checking your internet connection\n- Using the Local search mode instead`);
+          setSearchProgress('API search failed. You can add stores manually.');
+          alert(`API search failed: ${error instanceof Error ? error.message : 'Unknown error'}\n\nYou can:\n- Add stores manually using "Add Store" button\n- Try the Local search mode\n- Check your internet connection`);
         }
       } else {
         // Local search using Nominatim
@@ -931,6 +982,35 @@ export default function AdminPage() {
                             Found {storeLocations.length} locations
                           </span>
                           <div className="flex items-center gap-2">
+                            {searchMode === 'nationwide' && saveToDatabase && (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (confirm(`Save all ${storeLocations.length} locations to database? This will make future searches faster.`)) {
+                                    setSearchProgress('Saving to database...');
+                                    const storesToSave: StoreLocation[] = storeLocations.map((loc: any) => ({
+                                      brandName: storeSearchQuery.trim(),
+                                      storeName: loc.name || loc.storeName,
+                                      address: loc.address,
+                                      city: loc.city,
+                                      state: loc.state,
+                                      zipCode: loc.zipCode,
+                                      lat: loc.lat,
+                                      lng: loc.lng,
+                                      source: 'overpass',
+                                      verified: false,
+                                    }));
+                                    
+                                    const result = await bulkSaveStoreLocations(storesToSave, storeSearchQuery.trim());
+                                    alert(`Saved ${result.saved} locations to database. ${result.skipped} were duplicates. ${result.errors} had errors.`);
+                                    setSearchProgress('');
+                                  }
+                                }}
+                                className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
+                              >
+                                Save All to DB
+                              </button>
+                            )}
                             {storeLocations.length > 1 && (
                               <button
                                 type="button"
@@ -1030,6 +1110,127 @@ export default function AdminPage() {
                         )}
                       </div>
                     )}
+                  
+                  {/* Manual Store Entry */}
+                  <details className="mt-4">
+                    <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-900 mb-2 font-medium">
+                      + Add Store Manually
+                    </summary>
+                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 mt-2">
+                      <p className="text-xs text-gray-600 mb-3">
+                        Manually add a store location. This will be saved to the database for future searches.
+                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <input
+                          type="text"
+                          placeholder="Store Name"
+                          id="manualStoreName"
+                          className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Address"
+                          id="manualAddress"
+                          className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        />
+                        <input
+                          type="text"
+                          placeholder="City"
+                          id="manualCity"
+                          className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        />
+                        <input
+                          type="text"
+                          placeholder="State (e.g., CA)"
+                          id="manualState"
+                          className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        />
+                        <input
+                          type="text"
+                          placeholder="ZIP Code"
+                          id="manualZip"
+                          className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        />
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            step="0.000001"
+                            placeholder="Latitude"
+                            id="manualLat"
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                          <input
+                            type="number"
+                            step="0.000001"
+                            placeholder="Longitude"
+                            id="manualLng"
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const nameInput = document.getElementById('manualStoreName') as HTMLInputElement;
+                            const addressInput = document.getElementById('manualAddress') as HTMLInputElement;
+                            const cityInput = document.getElementById('manualCity') as HTMLInputElement;
+                            const stateInput = document.getElementById('manualState') as HTMLInputElement;
+                            const zipInput = document.getElementById('manualZip') as HTMLInputElement;
+                            const latInput = document.getElementById('manualLat') as HTMLInputElement;
+                            const lngInput = document.getElementById('manualLng') as HTMLInputElement;
+
+                            if (!nameInput.value || !latInput.value || !lngInput.value) {
+                              alert('Please fill in at least store name, latitude, and longitude');
+                              return;
+                            }
+
+                            const newStore: StoreLocation = {
+                              brandName: storeData.storeName || storeSearchQuery.trim(),
+                              storeName: nameInput.value,
+                              address: addressInput.value || undefined,
+                              city: cityInput.value || undefined,
+                              state: stateInput.value || undefined,
+                              zipCode: zipInput.value || undefined,
+                              lat: parseFloat(latInput.value),
+                              lng: parseFloat(lngInput.value),
+                              source: 'manual',
+                              verified: true,
+                            };
+
+                            const saved = await saveStoreLocation(newStore);
+                            if (saved) {
+                              alert('Store saved to database!');
+                              // Add to current locations list
+                              setStoreLocations([...storeLocations, {
+                                lat: saved.lat,
+                                lng: saved.lng,
+                                name: saved.storeName,
+                                address: saved.address,
+                                city: saved.city,
+                                state: saved.state,
+                                zipCode: saved.zipCode,
+                                displayName: saved.address 
+                                  ? `${saved.storeName}, ${saved.address}, ${saved.city}, ${saved.state} ${saved.zipCode}`.trim()
+                                  : `${saved.storeName}, ${saved.city}, ${saved.state}`.trim(),
+                              }]);
+                              // Clear form
+                              nameInput.value = '';
+                              addressInput.value = '';
+                              cityInput.value = '';
+                              stateInput.value = '';
+                              zipInput.value = '';
+                              latInput.value = '';
+                              lngInput.value = '';
+                            } else {
+                              alert('Failed to save store. Please try again.');
+                            }
+                          }}
+                          className="col-span-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                        >
+                          Save Store to Database
+                        </button>
+                      </div>
+                    </div>
+                  </details>
                   </div>
               </div>
 
